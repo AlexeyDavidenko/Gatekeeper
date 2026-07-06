@@ -275,7 +275,7 @@ public static class InternalEndpoints
             ProvisionTenantRequest body, ProvisionTenantHandler handler, CancellationToken ct) =>
         {
             if (!TenantSlugPattern.IsMatch(body.Slug))
-                return Results.BadRequest("Slug must be lowercase letters, digits, or underscores.");
+                return Results.BadRequest("Slug must be lowercase letters, digits, underscores, or hyphens.");
 
             var result = await handler.HandleAsync(new ProvisionTenantCommand(
                 body.Slug, body.Name, body.MainChatId, body.AdminChatId, body.MainChatTitle, body.AdminChatTitle), ct);
@@ -286,5 +286,5 @@ public static class InternalEndpoints
         return app;
     }
 
-    private static readonly Regex TenantSlugPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled);
+    private static readonly Regex TenantSlugPattern = new("^[a-z0-9_-]+$", RegexOptions.Compiled);
 }
