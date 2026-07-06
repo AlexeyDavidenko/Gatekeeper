@@ -44,6 +44,13 @@ builder.Services.AddScoped<ModerateUserHandler>();
 
 var app = builder.Build();
 
+using (var migrationScope = app.Services.CreateScope())
+{
+    var catalog = migrationScope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+    var tenantFactory = migrationScope.ServiceProvider.GetRequiredService<TenantDbContextFactory>();
+    await MigrationRunner.MigrateAllAsync(catalog, tenantFactory);
+}
+
 app.MapDefaultEndpoints();                       // /health, /alive (Aspire)
 app.UseMiddleware<InternalApiKeyMiddleware>();   // service-to-service auth on the private network
 app.UseMiddleware<TenantContextMiddleware>();    // resolves X-Tenant-Id -> ITenantContext
