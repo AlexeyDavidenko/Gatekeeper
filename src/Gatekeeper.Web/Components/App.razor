@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>Gatekeeper</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5; }
+        .page { max-width: 860px; margin: 0 auto; padding: 0 1rem 3rem; }
+        .topbar { display: flex; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #8884; }
+        .brand { font-weight: 700; text-decoration: none; color: inherit; margin-right: auto; }
+        .user { opacity: .7; font-size: .9rem; }
+        .inline { display: inline; }
+        button.link { background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; }
+        table.grid { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        table.grid th, table.grid td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid #8883; }
+        .muted { opacity: .7; }
+        .error { color: #dc2626; }
+        .answers { margin: 1rem 0; }
+        .answer { padding: .6rem 0; border-bottom: 1px solid #8882; }
+        .answer .q { font-weight: 600; }
+        .actions { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1.5rem; }
+        .actions form { display: flex; gap: .5rem; align-items: center; }
+        button.approve { background: #16a34a; color: #fff; border: 0; padding: .5rem 1rem; border-radius: .375rem; cursor: pointer; }
+        button.reject { background: #dc2626; color: #fff; border: 0; padding: .5rem 1rem; border-radius: .375rem; cursor: pointer; }
+        input[type=text] { padding: .45rem .5rem; border: 1px solid #8886; border-radius: .375rem; }
+    </style>
+    <HeadOutlet />
+</head>
+<body>
+    <Routes />
+</body>
+</html>

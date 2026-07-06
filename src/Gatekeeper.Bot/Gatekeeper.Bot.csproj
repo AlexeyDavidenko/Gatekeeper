@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Gatekeeper.Bot-5e03f405-f669-4a8a-b2e2-2f8e573dc9fc</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Telegram.Bot" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gatekeeper.Contracts\Gatekeeper.Contracts.csproj" />
+    <ProjectReference Include="..\Gatekeeper.ServiceDefaults\Gatekeeper.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>

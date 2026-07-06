@@ -1,0 +1,56 @@
+using Gatekeeper.Api;
+using Gatekeeper.Application;
+using Gatekeeper.Application.Applications;
+using Gatekeeper.Infrastructure;
+using Gatekeeper.ServiceDefaults;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();   // Aspire: OpenTelemetry, health checks, resilient HttpClient defaults
+
+// Tenancy
+builder.Services.AddScoped<TenantContext>();
+builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
+builder.Services.AddSingleton<ITenantConnectionFactory, TenantConnectionFactory>();
+builder.Services.AddSingleton<IClock, SystemClock>();
+
+// Catalog (control-plane) DB — fixed connection string.
+builder.Services.AddDbContext<CatalogDbContext>(o =>
+    o.UseNpgsql(builder.Configuration.GetConnectionString("catalog")));
+
+// Tenant DB — connection resolved per request from the (middleware-populated) ITenantContext.
+builder.Services.AddDbContext<TenantDbContext>((sp, o) =>
+{
+    var tenant = sp.GetRequiredService<ITenantContext>();
+    var conn = sp.GetRequiredService<ITenantConnectionFactory>();
+    if (tenant.IsResolved)
+        o.UseNpgsql(conn.ForDatabase(tenant.DatabaseName));
+});
+builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<TenantDbContext>());
+
+// Repositories + handlers
+builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
+builder.Services.AddScoped<IModerationRepository, ModerationRepository>();
+builder.Services.AddScoped<ITelegramCommandQueue, TelegramCommandQueue>();
+builder.Services.AddScoped<ITenantDirectory, TenantDirectory>();
+builder.Services.AddScoped<TenantDbContextFactory>();        // cross-tenant outbox drain
+builder.Services.AddScoped<DecideApplicationHandler>();
+builder.Services.AddScoped<CreateApplicationHandler>();
+builder.Services.AddScoped<SubmitAnswerHandler>();
+builder.Services.AddScoped<ModerateUserHandler>();
+
+var app = builder.Build();
+
+app.MapDefaultEndpoints();                       // /health, /alive (Aspire)
+app.UseMiddleware<InternalApiKeyMiddleware>();   // service-to-service auth on the private network
+app.UseMiddleware<TenantContextMiddleware>();    // resolves X-Tenant-Id -> ITenantContext
+
+app.MapApplicationsEndpoints();
+app.MapModerationEndpoints();
+app.MapInternalEndpoints();                       // tenant resolve + outbox drain (tenant-agnostic)
+// app.MapQuestionsEndpoints(); ...
+
+app.Run();

@@ -1,0 +1,39 @@
+@page "/"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<h1>Заявки на рассмотрении</h1>
+
+@if (_apps is null)
+{
+    <p>Загрузка…</p>
+}
+else if (_apps.Count == 0)
+{
+    <p class="muted">Очередь пуста.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>#</th><th>Пользователь</th><th>Отправлена</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var a in _apps)
+            {
+                <tr>
+                    <td>@a.Id</td>
+                    <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
+                    <td>@(a.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                    <td><a href="applications/@a.Id">Открыть</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<ApplicationSummary>? _apps;
+
+    protected override async Task OnInitializedAsync() => _apps = await Api.GetPendingAsync();
+}

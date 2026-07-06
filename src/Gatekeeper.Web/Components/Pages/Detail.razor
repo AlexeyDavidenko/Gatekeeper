@@ -1,0 +1,56 @@
+@page "/applications/{Id:long}"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<p><a href="/">← к очереди</a></p>
+
+@if (_card is null)
+{
+    <p>Загрузка…</p>
+}
+else
+{
+    <h1>Заявка #@_card.Id</h1>
+    <p class="muted">
+        @(_card.DisplayName ?? "—") @(_card.Username is null ? "" : $"(@{_card.Username})") · статус: @_card.Status
+    </p>
+
+    <div class="answers">
+        @foreach (var ans in _card.Answers)
+        {
+            <div class="answer">
+                <div class="q">@ans.Position. @ans.Prompt</div>
+                <div class="a">@(string.IsNullOrWhiteSpace(ans.Text) ? "—" : ans.Text)</div>
+            </div>
+        }
+    </div>
+
+    @if (_card.Status == "AwaitingReview")
+    {
+        <div class="actions">
+            <form method="post" action="applications/@_card.Id/approve">
+                <AntiforgeryToken />
+                <input type="hidden" name="rowVersion" value="@_card.RowVersion" />
+                <button type="submit" class="approve">Принять</button>
+            </form>
+            <form method="post" action="applications/@_card.Id/reject">
+                <AntiforgeryToken />
+                <input type="hidden" name="rowVersion" value="@_card.RowVersion" />
+                <input type="text" name="reason" placeholder="Причина (необязательно)" />
+                <button type="submit" class="reject">Отклонить</button>
+            </form>
+        </div>
+    }
+    else
+    {
+        <p class="muted">Решение уже принято.</p>
+    }
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private ApplicationCard? _card;
+
+    protected override async Task OnInitializedAsync() => _card = await Api.GetCardAsync(Id);
+}

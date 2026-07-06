@@ -1,0 +1,19 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <header class="topbar">
+        <a class="brand" href="/">Gatekeeper</a>
+        <AuthorizeView>
+            <Authorized>
+                <span class="user">@context.User.Identity?.Name</span>
+                <form method="post" action="auth/logout" class="inline">
+                    <AntiforgeryToken />
+                    <button type="submit" class="link">Выйти</button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </header>
+    <main>
+        @Body
+    </main>
+</div>

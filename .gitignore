@@ -1,0 +1,25 @@
+# Build artifacts
+bin/
+obj/
+out/
+deploy/
+
+# IDE
+.idea/
+.vs/
+*.user
+*.suo
+
+# OS
+.DS_Store
+
+# Secrets / local config
+.env
+*.local.json
+appsettings.*.local.json
+
+# Aspire
+.aspire/
+
+# Internal docs — not part of the public repo
+/docs/

@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gatekeeper.Api\Gatekeeper.Api.csproj" />
+    <ProjectReference Include="..\Gatekeeper.Bot\Gatekeeper.Bot.csproj" />
+    <ProjectReference Include="..\Gatekeeper.Web\Gatekeeper.Web.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>31bf1a93-8733-44eb-91e2-c6d170b774cd</UserSecretsId>
+  </PropertyGroup>
+
+</Project>
