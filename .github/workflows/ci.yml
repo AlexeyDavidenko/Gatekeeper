@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify-migrations:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      CATALOG_CONNECTION: "Host=localhost;Port=5432;Database=gatekeeper_catalog;Username=postgres;Password=postgres"
+      TENANT_SERVER: "Host=localhost;Port=5432;Username=postgres;Password=postgres"
+      TENANT_DB_NAME: tenant_ci_demo
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Gatekeeper.slnx
+
+      - name: Build
+        run: dotnet build Gatekeeper.slnx --no-restore --configuration Release
+
+      # Same tool/version used locally (see docs/changelog.md) so `dotnet ef` behaves identically.
+      - name: Install dotnet-ef
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.9
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Create empty databases
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE DATABASE gatekeeper_catalog;"
+          psql -h localhost -U postgres -c "CREATE DATABASE ${TENANT_DB_NAME};"
+
+      # Applies the real InitialCreate migration against a real Postgres — this is the check that
+      # would have caught a broken model/migration before it reached the server.
+      - name: Apply Catalog migration
+        run: >-
+          dotnet ef database update
+          --project src/Gatekeeper.Infrastructure
+          --startup-project src/Gatekeeper.Infrastructure
+          --context CatalogDbContext
+          --connection "${CATALOG_CONNECTION}"
+
+      # Seeds one active tenant so the migration runner (below) has something to migrate — mirrors
+      # the manual verification in docs/changelog.md.
+      - name: Seed an active tenant row
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql -h localhost -U postgres -d gatekeeper_catalog -c
+          "INSERT INTO \"Tenants\" (\"Slug\",\"Name\",\"DatabaseName\",\"IsActive\",\"CreatedAt\")
+           VALUES ('ci-demo','CI Demo','${TENANT_DB_NAME}', true, now());"
+
+      # Boots the real API against the service Postgres: exercises MigrationRunner exactly as it
+      # runs in production, including the cross-tenant migration loop — not just the CLI tooling.
+      - name: Start API
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:5299
+          ConnectionStrings__catalog: ${{ env.CATALOG_CONNECTION }}
+          Postgres__Server: ${{ env.TENANT_SERVER }}
+          Internal__ApiKey: ci-test-key
+        run: |
+          nohup dotnet src/Gatekeeper.Api/bin/Release/net10.0/Gatekeeper.Api.dll > api.log 2>&1 &
+          echo $! > api.pid
+
+      - name: Wait for API health check
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:5299/health; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become healthy in time"
+          exit 1
+
+      - name: Verify the tenant database was migrated
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d "${TENANT_DB_NAME}" -c "\dt" | grep -q 'Applications' \
+            || (echo "Tenant database was not migrated" && exit 1)
+
+      - name: Show API log
+        if: always()
+        run: cat api.log || true
+
+      - name: Stop API
+        if: always()
+        run: kill "$(cat api.pid)" 2>/dev/null || true
