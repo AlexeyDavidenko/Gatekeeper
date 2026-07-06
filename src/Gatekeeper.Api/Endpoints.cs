@@ -5,7 +5,9 @@ using Gatekeeper.Infrastructure;
 namespace Gatekeeper.Api;
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Gatekeeper.Application.Applications;
+using Gatekeeper.Application.Tenants;
 using Gatekeeper.Contracts;
 using Gatekeeper.Domain.Outbox;
 using Microsoft.EntityFrameworkCore;
@@ -267,6 +269,22 @@ public static class InternalEndpoints
             return Results.NoContent();
         });
 
+        // Idempotent tenant provisioning: creates + migrates the tenant's database and registers
+        // it (with its two chats) in the Catalog. Safe to call again for an already-known slug.
+        g.MapPost("/tenants/provision", async (
+            ProvisionTenantRequest body, ProvisionTenantHandler handler, CancellationToken ct) =>
+        {
+            if (!TenantSlugPattern.IsMatch(body.Slug))
+                return Results.BadRequest("Slug must be lowercase letters, digits, or underscores.");
+
+            var result = await handler.HandleAsync(new ProvisionTenantCommand(
+                body.Slug, body.Name, body.MainChatId, body.AdminChatId, body.MainChatTitle, body.AdminChatTitle), ct);
+
+            return Results.Ok(new ProvisionTenantResponse(result.TenantId, result.DatabaseName, result.WasCreated));
+        });
+
         return app;
     }
+
+    private static readonly Regex TenantSlugPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled);
 }

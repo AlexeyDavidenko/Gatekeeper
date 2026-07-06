@@ -110,6 +110,35 @@ jobs:
           psql -h localhost -U postgres -d "${TENANT_DB_NAME}" -c "\dt" | grep -q 'Applications' \
             || (echo "Tenant database was not migrated" && exit 1)
 
+      # Exercises POST /internal/tenants/provision end to end: CREATE DATABASE, migrate it, and
+      # register the tenant + its two chats in the Catalog.
+      - name: Provision a new tenant via the API
+        run: |
+          response=$(curl -sf -X POST http://localhost:5299/internal/tenants/provision \
+            -H "Content-Type: application/json" \
+            -H "X-Internal-Key: ci-test-key" \
+            -d '{"slug":"ci-provision","name":"CI Provision","mainChatId":-1001,"adminChatId":-2002,"mainChatTitle":null,"adminChatTitle":null}')
+          echo "$response"
+          echo "$response" | grep -q '"wasCreated":true' \
+            || (echo "Expected wasCreated:true on first provision" && exit 1)
+
+      - name: Verify the provisioned tenant database exists
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d tenant_ci_provision -c "\dt" | grep -q 'Applications' \
+            || (echo "Provisioned tenant database was not migrated" && exit 1)
+
+      - name: Re-provisioning the same slug is idempotent
+        run: |
+          response=$(curl -sf -X POST http://localhost:5299/internal/tenants/provision \
+            -H "Content-Type: application/json" \
+            -H "X-Internal-Key: ci-test-key" \
+            -d '{"slug":"ci-provision","name":"CI Provision","mainChatId":-1001,"adminChatId":-2002,"mainChatTitle":null,"adminChatTitle":null}')
+          echo "$response"
+          echo "$response" | grep -q '"wasCreated":false' \
+            || (echo "Expected wasCreated:false on re-provision" && exit 1)
+
       - name: Show API log
         if: always()
         run: cat api.log || true

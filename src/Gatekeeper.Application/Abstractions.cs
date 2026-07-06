@@ -53,6 +53,25 @@ public interface ITenantDirectory
     Task<long?> GetAdminChatIdAsync(long tenantId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Catalog-level persistence for tenant registration — a separate boundary from the per-tenant
+/// IUnitOfWork, since the Catalog is the shared control-plane DB, not a tenant's own.
+/// </summary>
+public interface ITenantCatalogRepository
+{
+    Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default);
+    Task AddAsync(Tenant tenant, CancellationToken ct = default);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+
+/// <summary>Physically creates and migrates a new tenant's database.</summary>
+public interface ITenantProvisioner
+{
+    Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken ct = default);
+    Task CreateDatabaseAsync(string databaseName, CancellationToken ct = default);
+    Task MigrateAsync(string databaseName, CancellationToken ct = default);
+}
+
 public interface IModerationRepository
 {
     Task AddAsync(ModerationAction action, CancellationToken ct = default);

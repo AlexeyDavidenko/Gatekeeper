@@ -1,6 +1,7 @@
 using Gatekeeper.Api;
 using Gatekeeper.Application;
 using Gatekeeper.Application.Applications;
+using Gatekeeper.Application.Tenants;
 using Gatekeeper.Infrastructure;
 using Gatekeeper.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,9 @@ builder.Services.AddScoped<IModerationRepository, ModerationRepository>();
 builder.Services.AddScoped<ITelegramCommandQueue, TelegramCommandQueue>();
 builder.Services.AddScoped<ITenantDirectory, TenantDirectory>();
 builder.Services.AddScoped<TenantDbContextFactory>();        // cross-tenant outbox drain
+builder.Services.AddScoped<ITenantCatalogRepository, TenantCatalogRepository>();
+builder.Services.AddScoped<ITenantProvisioner, TenantProvisioner>();
+builder.Services.AddScoped<ProvisionTenantHandler>();
 builder.Services.AddScoped<DecideApplicationHandler>();
 builder.Services.AddScoped<CreateApplicationHandler>();
 builder.Services.AddScoped<SubmitAnswerHandler>();

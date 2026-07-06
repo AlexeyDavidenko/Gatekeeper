@@ -109,6 +109,52 @@ public sealed class TenantDirectory(CatalogDbContext catalog) : ITenantDirectory
     }
 }
 
+public sealed class TenantCatalogRepository(CatalogDbContext catalog) : ITenantCatalogRepository
+{
+    public Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default) =>
+        catalog.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ct);
+
+    public async Task AddAsync(Tenant tenant, CancellationToken ct = default) =>
+        await catalog.Tenants.AddAsync(tenant, ct);
+
+    public Task SaveChangesAsync(CancellationToken ct = default) => catalog.SaveChangesAsync(ct);
+}
+
+/// <summary>
+/// Creates and migrates a brand-new tenant database. CREATE DATABASE / existence checks run
+/// against Postgres's own always-present "postgres" maintenance database.
+/// </summary>
+public sealed class TenantProvisioner(
+    ITenantConnectionFactory connections, TenantDbContextFactory tenantDbFactory) : ITenantProvisioner
+{
+    private string AdminConnectionString => connections.ForDatabase("postgres");
+
+    public async Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(AdminConnectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT 1 FROM pg_database WHERE datname = @name", conn);
+        cmd.Parameters.AddWithValue("name", databaseName);
+        return await cmd.ExecuteScalarAsync(ct) is not null;
+    }
+
+    public async Task CreateDatabaseAsync(string databaseName, CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(AdminConnectionString);
+        await conn.OpenAsync(ct);
+        // Database names can't be parameterized in DDL — quote the identifier instead.
+        var quoted = new NpgsqlCommandBuilder().QuoteIdentifier(databaseName);
+        await using var cmd = new NpgsqlCommand($"CREATE DATABASE {quoted}", conn);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task MigrateAsync(string databaseName, CancellationToken ct = default)
+    {
+        await using var db = tenantDbFactory.ForDatabase(databaseName);
+        await db.Database.MigrateAsync(ct);
+    }
+}
+
 /// <summary>Builds a tenant context for an arbitrary database — used by the cross-tenant outbox drain.</summary>
 public sealed class TenantDbContextFactory(ITenantConnectionFactory connections)
 {

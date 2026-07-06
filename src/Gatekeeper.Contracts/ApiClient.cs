@@ -37,6 +37,14 @@ public sealed record ApplicationCard(
 
 public sealed record AnswerDto(string Prompt, string Type, int Position, string? Text);
 
+// --- Tenant provisioning (control-plane, tenant-agnostic) ---
+
+public sealed record ProvisionTenantRequest(
+    string Slug, string Name, long MainChatId, long AdminChatId,
+    string? MainChatTitle, string? AdminChatTitle);
+
+public sealed record ProvisionTenantResponse(long TenantId, string DatabaseName, bool WasCreated);
+
 // --- Outbox drain (control-plane, tenant-agnostic) ---
 
 public sealed record PendingCommand(
