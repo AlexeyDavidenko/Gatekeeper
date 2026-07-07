@@ -77,15 +77,19 @@ public static class WebEndpoints
             => DecideAsync(id, approve: false, ctx, api, af, ct));
 
         // Question management form posts — same auth/antiforgery shape as decisions above.
+        // NB: these must NOT share a URL with a @page route (Razor component endpoints match
+        // any HTTP verb on their route template) — "/questions/{id}/edit" collided with
+        // QuestionEdit.razor's own "/questions/{Id:long}/edit" page route and threw
+        // AmbiguousMatchException on every submit. Suffixed "/create" and "/save" instead.
         var questions = app.MapGroup("/questions").RequireAuthorization();
-        questions.MapPost("/", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        questions.MapPost("/create", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
         {
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
             await api.CreateQuestionAsync(form["promptText"]!, form["isRequired"] == "true", ct);
             return Results.Redirect("/questions");
         });
-        questions.MapPost("/{id:long}/edit", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        questions.MapPost("/{id:long}/save", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
         {
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);

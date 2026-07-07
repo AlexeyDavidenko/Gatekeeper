@@ -48,7 +48,7 @@ else
 }
 
 <h2>Добавить вопрос</h2>
-<form method="post" action="questions">
+<form method="post" action="questions/create">
     <AntiforgeryToken />
     <input type="text" name="promptText" placeholder="Текст вопроса" required />
     <label><input type="checkbox" name="isRequired" value="true" /> обязательный</label>

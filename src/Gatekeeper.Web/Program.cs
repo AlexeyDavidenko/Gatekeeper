@@ -38,6 +38,11 @@ builder.Services.AddHttpClient<AdminApiClient>(http =>
 
 var app = builder.Build();
 
+// Without this, an unhandled exception anywhere in the pipeline (e.g. a routing conflict, a bad
+// API call) renders as a blank white page in Production — no Development exception page, and
+// nothing here to catch it and show something. Error.razor already existed but was never wired up.
+app.UseExceptionHandler("/Error", createScopeForErrors: true);
+
 app.UseStaticFiles();          // wwwroot/* (localtime.js, app.css) — was missing entirely, so these 404'd
 app.UseAuthentication();
 app.UseAuthorization();
