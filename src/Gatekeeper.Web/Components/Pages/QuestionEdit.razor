@@ -1,0 +1,28 @@
+@page "/questions/{Id:long}/edit"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<p><a href="/questions">← к вопросам</a></p>
+
+@if (_question is null)
+{
+    <p>Загрузка…</p>
+}
+else
+{
+    <h1>Редактировать вопрос #@_question.Id</h1>
+    <form method="post" action="/questions/@_question.Id/edit">
+        <AntiforgeryToken />
+        <input type="text" name="promptText" value="@_question.PromptText" required />
+        <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> обязательный</label>
+        <button type="submit" class="approve">Сохранить</button>
+    </form>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private QuestionDto? _question;
+
+    protected override async Task OnInitializedAsync() => _question = await Api.GetQuestionAsync(Id);
+}

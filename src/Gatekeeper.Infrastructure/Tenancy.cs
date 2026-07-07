@@ -97,6 +97,12 @@ public sealed class QuestionRepository(TenantDbContext db) : IQuestionRepository
 
     public Task<Question?> GetNextActiveAsync(int afterPosition, CancellationToken ct = default) =>
         db.Questions.Where(q => q.IsActive && q.Position > afterPosition).OrderBy(q => q.Position).FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<Question>> GetAllAsync(CancellationToken ct = default) =>
+        await db.Questions.OrderBy(q => q.Position).ToListAsync(ct);
+
+    public async Task AddAsync(Question question, CancellationToken ct = default) =>
+        await db.Questions.AddAsync(question, ct);
 }
 
 public sealed class TenantDirectory(CatalogDbContext catalog) : ITenantDirectory

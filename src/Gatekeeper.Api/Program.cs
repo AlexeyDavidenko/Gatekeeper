@@ -45,6 +45,10 @@ builder.Services.AddScoped<DecideApplicationHandler>();
 builder.Services.AddScoped<CreateApplicationHandler>();
 builder.Services.AddScoped<SubmitAnswerHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();
+builder.Services.AddScoped<CreateQuestionHandler>();
+builder.Services.AddScoped<EditQuestionHandler>();
+builder.Services.AddScoped<MoveQuestionHandler>();
+builder.Services.AddScoped<DeactivateQuestionHandler>();
 
 var app = builder.Build();
 
@@ -62,6 +66,6 @@ app.UseMiddleware<TenantContextMiddleware>();    // resolves X-Tenant-Id -> ITen
 app.MapApplicationsEndpoints();
 app.MapModerationEndpoints();
 app.MapInternalEndpoints();                       // tenant resolve + outbox drain (tenant-agnostic)
-// app.MapQuestionsEndpoints(); ...
+app.MapQuestionsEndpoints();
 
 app.Run();

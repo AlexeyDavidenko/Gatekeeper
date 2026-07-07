@@ -1,0 +1,62 @@
+@page "/questions"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<h1>Вопросы анкеты</h1>
+
+@if (_questions is null)
+{
+    <p>Загрузка…</p>
+}
+else if (_questions.Count == 0)
+{
+    <p class="muted">Вопросов пока нет.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>#</th><th>Текст</th><th>Обязательный</th><th>Активен</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var q in _questions)
+            {
+                <tr>
+                    <td>@q.Position</td>
+                    <td>@q.PromptText</td>
+                    <td>@(q.IsRequired ? "да" : "нет")</td>
+                    <td>@(q.IsActive ? "да" : "нет")</td>
+                    <td class="actions">
+                        <form method="post" action="questions/@q.Id/move-up" class="inline">
+                            <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
+                        </form>
+                        <form method="post" action="questions/@q.Id/move-down" class="inline">
+                            <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
+                        </form>
+                        <a href="questions/@q.Id/edit">Редактировать</a>
+                        @if (q.IsActive)
+                        {
+                            <form method="post" action="questions/@q.Id/deactivate" class="inline">
+                                <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2>Добавить вопрос</h2>
+<form method="post" action="questions">
+    <AntiforgeryToken />
+    <input type="text" name="promptText" placeholder="Текст вопроса" required />
+    <label><input type="checkbox" name="isRequired" value="true" /> обязательный</label>
+    <button type="submit" class="approve">Добавить</button>
+</form>
+
+@code {
+    private IReadOnlyList<QuestionDto>? _questions;
+
+    protected override async Task OnInitializedAsync() => _questions = await Api.GetQuestionsAsync();
+}

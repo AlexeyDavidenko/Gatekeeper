@@ -33,6 +33,50 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         return await res.Content.ReadFromJsonAsync<List<ModerationLogEntry>>(ct) ?? [];
     }
 
+    public async Task<IReadOnlyList<QuestionDto>> GetQuestionsAsync(CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get("/questions"), ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<QuestionDto>>(ct) ?? [];
+    }
+
+    public async Task<QuestionDto?> GetQuestionAsync(long id, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get($"/questions/{id}"), ct);
+        if (res.StatusCode == HttpStatusCode.NotFound) return null;
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<QuestionDto>(ct);
+    }
+
+    public async Task CreateQuestionAsync(string promptText, bool isRequired, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post("/questions", new CreateQuestionRequest(promptText, isRequired)), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    public async Task EditQuestionAsync(long id, string promptText, bool isRequired, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Put, $"/questions/{id}")
+        {
+            Headers = { { "X-Tenant-Id", TenantId.ToString() } },
+            Content = JsonContent.Create(new EditQuestionRequest(promptText, isRequired)),
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    public async Task MoveQuestionAsync(long id, bool up, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post($"/questions/{id}/{(up ? "move-up" : "move-down")}"), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeactivateQuestionAsync(long id, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post($"/questions/{id}/deactivate"), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     public async Task<DecisionOutcome> DecideAsync(
         long id, uint rowVersion, bool approve, string? reason, long actingUserId, string? actingUserName,
         CancellationToken ct = default)
@@ -55,4 +99,10 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
 
     private HttpRequestMessage Get(string path) =>
         new(HttpMethod.Get, path) { Headers = { { "X-Tenant-Id", TenantId.ToString() } } };
+
+    private HttpRequestMessage Post(string path, object? body = null) => new(HttpMethod.Post, path)
+    {
+        Headers = { { "X-Tenant-Id", TenantId.ToString() } },
+        Content = body is null ? null : JsonContent.Create(body),
+    };
 }

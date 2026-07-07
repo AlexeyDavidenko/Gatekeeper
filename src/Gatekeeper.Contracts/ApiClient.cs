@@ -37,6 +37,12 @@ public sealed record ApplicationCard(
 
 public sealed record AnswerDto(string Prompt, string Type, int Position, string? Text);
 
+// Question management. Only plain text prompts are exposed here — the survey engine has no
+// rendering/answer-parsing for the other QuestionType values yet (see docs/backlog.md).
+public sealed record QuestionDto(long Id, int Position, string PromptText, bool IsRequired, bool IsActive);
+public sealed record CreateQuestionRequest(string PromptText, bool IsRequired);
+public sealed record EditQuestionRequest(string PromptText, bool IsRequired);
+
 public sealed record ModerationLogEntry(
     long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,
     string Action, string? Reason, string? Notes, long PerformedByUserId, string? PerformedByName,

@@ -6,6 +6,7 @@
         <AuthorizeView>
             <Authorized>
                 <a class="nav" href="/">Очередь</a>
+                <a class="nav" href="/questions">Вопросы</a>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>
                         <a class="nav" href="/audit">Аудит-лог</a>

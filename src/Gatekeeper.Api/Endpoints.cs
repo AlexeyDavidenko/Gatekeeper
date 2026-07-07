@@ -175,6 +175,60 @@ public static class ApplicationsEndpoints
         user is null ? null : $"{user.FirstName} {user.LastName}".Trim() is { Length: > 0 } name ? name : null;
 }
 
+public static class QuestionsEndpoints
+{
+    public static IEndpointRouteBuilder MapQuestionsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/questions");
+
+        group.MapGet("/", async (TenantDbContext db, CancellationToken ct) =>
+        {
+            var qs = await db.Questions.AsNoTracking().OrderBy(q => q.Position).ToListAsync(ct);
+            return Results.Ok(qs.Select(ToDto).ToList());
+        });
+
+        group.MapGet("/{id:long}", async (long id, TenantDbContext db, CancellationToken ct) =>
+        {
+            var q = await db.Questions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            return q is null ? Results.NotFound() : Results.Ok(ToDto(q));
+        });
+
+        group.MapPost("/", async (CreateQuestionRequest body, CreateQuestionHandler handler, CancellationToken ct) =>
+        {
+            var id = await handler.HandleAsync(new CreateQuestionCommand(body.PromptText, body.IsRequired), ct);
+            return Results.Ok(new { Id = id });
+        });
+
+        group.MapPut("/{id:long}", async (long id, EditQuestionRequest body, EditQuestionHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new EditQuestionCommand(id, body.PromptText, body.IsRequired), ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:long}/move-up", async (long id, MoveQuestionHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new MoveQuestionCommand(id, Up: true), ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:long}/move-down", async (long id, MoveQuestionHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new MoveQuestionCommand(id, Up: false), ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:long}/deactivate", async (long id, DeactivateQuestionHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new DeactivateQuestionCommand(id), ct);
+            return Results.NoContent();
+        });
+
+        return app;
+    }
+
+    private static QuestionDto ToDto(Question q) => new(q.Id, q.Position, q.PromptText, q.IsRequired, q.IsActive);
+}
+
 public static class ModerationEndpoints
 {
     public static IEndpointRouteBuilder MapModerationEndpoints(this IEndpointRouteBuilder app)

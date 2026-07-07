@@ -45,6 +45,8 @@ public interface IQuestionRepository
     Task<Question?> GetByIdAsync(long id, CancellationToken ct = default);
     Task<Question?> GetFirstActiveAsync(CancellationToken ct = default);
     Task<Question?> GetNextActiveAsync(int afterPosition, CancellationToken ct = default);
+    Task<IReadOnlyList<Question>> GetAllAsync(CancellationToken ct = default);
+    Task AddAsync(Question question, CancellationToken ct = default);
 }
 
 /// <summary>Resolves cross-tenant routing facts (e.g. the admin group chat) from the catalog.</summary>

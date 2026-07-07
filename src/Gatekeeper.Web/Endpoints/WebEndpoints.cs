@@ -57,7 +57,42 @@ public static class WebEndpoints
         apps.MapPost("/{id:long}/reject", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
             => DecideAsync(id, approve: false, ctx, api, af, ct));
 
+        // Question management form posts — same auth/antiforgery shape as decisions above.
+        var questions = app.MapGroup("/questions").RequireAuthorization();
+        questions.MapPost("/", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            var form = await ctx.Request.ReadFormAsync(ct);
+            await api.CreateQuestionAsync(form["promptText"]!, form["isRequired"] == "true", ct);
+            return Results.Redirect("/questions");
+        });
+        questions.MapPost("/{id:long}/edit", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            var form = await ctx.Request.ReadFormAsync(ct);
+            await api.EditQuestionAsync(id, form["promptText"]!, form["isRequired"] == "true", ct);
+            return Results.Redirect("/questions");
+        });
+        questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
+            => MoveAsync(id, up: true, ctx, api, af, ct));
+        questions.MapPost("/{id:long}/move-down", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
+            => MoveAsync(id, up: false, ctx, api, af, ct));
+        questions.MapPost("/{id:long}/deactivate", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            await api.DeactivateQuestionAsync(id, ct);
+            return Results.Redirect("/questions");
+        });
+
         return app;
+    }
+
+    private static async Task<IResult> MoveAsync(
+        long id, bool up, HttpContext ctx, AdminApiClient api, IAntiforgery antiforgery, CancellationToken ct)
+    {
+        await ValidateAsync(antiforgery, ctx);
+        await api.MoveQuestionAsync(id, up, ct);
+        return Results.Redirect("/questions");
     }
 
     private static async Task<IResult> DecideAsync(
