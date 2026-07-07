@@ -17,8 +17,8 @@ public sealed class TelegramUpdateWorker(
     TenantRouter router,
     ILogger<TelegramUpdateWorker> log) : BackgroundService
 {
-    private const string WelcomeMessage = "👋 Welcome! Please answer a few quick questions to complete your application.";
-    private const string ThankYouMessage = "🙏 Thank you for your answers! Your application has been received and will be reviewed shortly.";
+    private const string WelcomeMessage = "👋 Добро пожаловать! Пожалуйста, ответьте на несколько вопросов, чтобы подать заявку.";
+    private const string ThankYouMessage = "🙏 Спасибо за ответы! Ваша заявка принята и будет рассмотрена в ближайшее время.";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
