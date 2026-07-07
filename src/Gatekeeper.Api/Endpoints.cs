@@ -171,7 +171,7 @@ public static class ApplicationsEndpoints
         return app;
     }
 
-    private static string? Display(TelegramUser? user) =>
+    internal static string? Display(TelegramUser? user) =>
         user is null ? null : $"{user.FirstName} {user.LastName}".Trim() is { Length: > 0 } name ? name : null;
 }
 
@@ -191,6 +191,31 @@ public static class ModerationEndpoints
                 telegramUserId, body.ChatId, action, body.Reason, body.Notes,
                 body.ActingUserId, body.ActingUserName, source, body.ExpiresAt), ct);
             return Results.NoContent();
+        });
+
+        // Audit log for the admin site — gated client-side to the elevated (Owner) role.
+        app.MapGet("/moderation", async (TenantDbContext db, CancellationToken ct) =>
+        {
+            var actions = await db.ModerationActions.AsNoTracking()
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(200)
+                .ToListAsync(ct);
+
+            var ids = actions.Select(a => a.TelegramUserId).Distinct().ToList();
+            var users = await db.Users.AsNoTracking()
+                .Where(u => ids.Contains(u.TelegramUserId))
+                .ToDictionaryAsync(u => u.TelegramUserId, ct);
+
+            var result = actions.Select(a =>
+            {
+                users.TryGetValue(a.TelegramUserId, out var u);
+                return new ModerationLogEntry(
+                    a.Id, a.TelegramUserId, u?.Username, ApplicationsEndpoints.Display(u), a.ApplicationId,
+                    a.Action.ToString(), a.Reason, a.Notes, a.PerformedByUserId, a.PerformedByName,
+                    a.Source.ToString(), a.CreatedAt);
+            }).ToList();
+
+            return Results.Ok(result);
         });
 
         return app;

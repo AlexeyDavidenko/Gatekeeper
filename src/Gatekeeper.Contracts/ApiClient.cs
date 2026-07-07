@@ -37,6 +37,11 @@ public sealed record ApplicationCard(
 
 public sealed record AnswerDto(string Prompt, string Type, int Position, string? Text);
 
+public sealed record ModerationLogEntry(
+    long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,
+    string Action, string? Reason, string? Notes, long PerformedByUserId, string? PerformedByName,
+    string Source, DateTimeOffset CreatedAt);
+
 // --- Tenant provisioning (control-plane, tenant-agnostic) ---
 
 public sealed record ProvisionTenantRequest(

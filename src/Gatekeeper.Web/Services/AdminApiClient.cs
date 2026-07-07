@@ -26,6 +26,13 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         return await res.Content.ReadFromJsonAsync<ApplicationCard>(ct);
     }
 
+    public async Task<IReadOnlyList<ModerationLogEntry>> GetAuditLogAsync(CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get("/moderation"), ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<ModerationLogEntry>>(ct) ?? [];
+    }
+
     public async Task<DecisionOutcome> DecideAsync(
         long id, uint rowVersion, bool approve, string? reason, long actingUserId, string? actingUserName,
         CancellationToken ct = default)

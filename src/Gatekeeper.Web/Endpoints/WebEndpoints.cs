@@ -22,7 +22,8 @@ public static class WebEndpoints
                 return Results.Redirect("/login?error=invalid");
 
             var adminChatId = long.Parse(config["Telegram:AdminChatId"]!);
-            if (!await adminChecker.IsAdminAsync(adminChatId, data.Id, ct))
+            var role = await adminChecker.GetRoleAsync(adminChatId, data.Id, ct);
+            if (role is null)
                 return Results.Redirect("/login?error=forbidden");
 
             var displayName = $"{data.FirstName} {data.LastName}".Trim();
@@ -33,6 +34,7 @@ public static class WebEndpoints
                 new(ClaimTypes.NameIdentifier, data.Id.ToString()),
                 new(ClaimTypes.Name, displayName),
                 new("tg_username", data.Username ?? string.Empty),
+                new(ClaimTypes.Role, role.Value.ToString()),
             };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
