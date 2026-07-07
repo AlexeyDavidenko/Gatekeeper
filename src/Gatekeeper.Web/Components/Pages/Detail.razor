@@ -11,9 +11,15 @@
 else
 {
     <h1>Заявка #@_card.Id</h1>
-    <p class="muted">
-        @(_card.DisplayName ?? "—") @(_card.Username is null ? "" : $"(@{_card.Username})") · статус: @_card.Status
+    <p>
+        <Avatar PhotoFileId="_card.PhotoFileId" DisplayName="_card.DisplayName" Username="_card.Username" Large="true" />
+        @(_card.DisplayName ?? "—") @(_card.Username is null ? "" : $"(@{_card.Username})")
     </p>
+    <p class="muted">статус: @_card.Status</p>
+    @if (!string.IsNullOrWhiteSpace(_card.Bio))
+    {
+        <p class="bio">ℹ️ @_card.Bio</p>
+    }
 
     <div class="answers">
         @foreach (var ans in _card.Answers)

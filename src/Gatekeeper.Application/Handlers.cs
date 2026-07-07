@@ -102,7 +102,7 @@ public sealed class SubmitAnswerHandler(
                 ?? throw new InvalidOperationException("Admin chat is not configured for this tenant.");
  
             var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
-            var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName);
+            var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName, user?.Bio);
 
             var payload = new TelegramCommandPayload(
                 ChatId: adminChatId,
@@ -111,6 +111,7 @@ public sealed class SubmitAnswerHandler(
                 Buttons: [
                     new TelegramButton("✅ Approve", $"appr:{application.Id}"),
                     new TelegramButton("❌ Reject", $"rej:{application.Id}"),
+                    new TelegramButton("📄 Показать ответы", $"ans:{application.Id}"),
                 ]);
             queue.Enqueue(TelegramCommand.Enqueue(TelegramCommandType.SendAdminCard,
                 JsonSerializer.Serialize(payload), application.Id, cmd.TelegramUserId, now));

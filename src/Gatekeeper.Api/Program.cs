@@ -42,6 +42,7 @@ builder.Services.AddScoped<ITenantCatalogRepository, TenantCatalogRepository>();
 builder.Services.AddScoped<ITenantProvisioner, TenantProvisioner>();
 builder.Services.AddScoped<ProvisionTenantHandler>();
 builder.Services.AddScoped<DecideApplicationHandler>();
+builder.Services.AddScoped<ToggleCardAnswersHandler>();
 builder.Services.AddScoped<CreateApplicationHandler>();
 builder.Services.AddScoped<SubmitAnswerHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();

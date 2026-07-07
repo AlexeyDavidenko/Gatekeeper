@@ -75,15 +75,17 @@ public sealed class DecideApplicationHandler(
             if (adminChatId is { } chatId)
             {
                 var user = await users.GetByTelegramIdAsync(application.TelegramUserId, ct);
-                var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName);
-                var verdict = cmd.Approve ? "✅ Approved" : "❌ Rejected";
+                var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName, user?.Bio);
                 var by = cmd.ActingUserName ?? cmd.ActingUserId.ToString();
-                var text = $"{header}\n\n{verdict} by {by}";
+                var text = header + AdminCardText.BuildVerdict(cmd.Approve, by);
 
+                // Decision collapses the answers block back down — approve/reject buttons are gone
+                // (nothing left to decide), only the show-answers toggle survives.
                 queue.Enqueue(TelegramCommand.Enqueue(
                     TelegramCommandType.EditMessage,
                     JsonSerializer.Serialize(new TelegramCommandPayload(
-                        ChatId: chatId, MessageId: cardMessageId, Text: text, IsPhotoCaption: application.AdminCardHasPhoto)),
+                        ChatId: chatId, MessageId: cardMessageId, Text: text, IsPhotoCaption: application.AdminCardHasPhoto,
+                        Buttons: [new TelegramButton("📄 Показать ответы", $"ans:{application.Id}")])),
                     application.Id, application.TelegramUserId, now));
             }
         }

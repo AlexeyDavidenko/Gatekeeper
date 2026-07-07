@@ -1,0 +1,40 @@
+@if (PhotoFileId is not null)
+{
+    <img class="avatar @(Large ? "avatar-lg" : "")" src="@($"/avatar/{Uri.EscapeDataString(PhotoFileId)}")" alt="" />
+}
+else
+{
+    <div class="avatar avatar-fallback @(Large ? "avatar-lg" : "")" style="background:@Color">@Initials</div>
+}
+
+@code {
+    [Parameter] public string? PhotoFileId { get; set; }
+    [Parameter] public string? DisplayName { get; set; }
+    [Parameter] public string? Username { get; set; }
+    [Parameter] public bool Large { get; set; }
+
+    private static readonly string[] Palette =
+        ["#e11d48", "#d97706", "#65a30d", "#0891b2", "#4f46e5", "#9333ea", "#db2777", "#0d9488"];
+
+    private string Initials
+    {
+        get
+        {
+            var parts = (DisplayName ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+            if (parts.Length == 1) return parts[0][0].ToString().ToUpperInvariant();
+            if (!string.IsNullOrEmpty(Username)) return Username[0].ToString().ToUpperInvariant();
+            return "?";
+        }
+    }
+
+    private string Color
+    {
+        get
+        {
+            var key = Username ?? DisplayName ?? "?";
+            var hash = key.Aggregate(0, (acc, c) => acc + c);
+            return Palette[hash % Palette.Length];
+        }
+    }
+}

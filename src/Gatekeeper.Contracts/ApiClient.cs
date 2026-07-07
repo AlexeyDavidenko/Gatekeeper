@@ -28,12 +28,12 @@ public sealed record AdminCallbackRequest(
 
 public sealed record ApplicationSummary(
     long Id, long TelegramUserId, string? Username, string? DisplayName,
-    string Status, DateTimeOffset? SubmittedAt);
+    string Status, DateTimeOffset? SubmittedAt, string? PhotoFileId);
 
 public sealed record ApplicationCard(
     long Id, long TelegramUserId, string? Username, string? DisplayName,
     string Status, DateTimeOffset CreatedAt, DateTimeOffset? SubmittedAt,
-    uint RowVersion, IReadOnlyList<AnswerDto> Answers);
+    uint RowVersion, IReadOnlyList<AnswerDto> Answers, string? Bio, string? PhotoFileId);
 
 public sealed record AnswerDto(string Prompt, string Type, int Position, string? Text);
 

@@ -70,6 +70,13 @@ public sealed class ModerationRepository(TenantDbContext db) : IModerationReposi
 {
     public async Task AddAsync(ModerationAction action, CancellationToken ct = default) =>
         await db.ModerationActions.AddAsync(action, ct);
+
+    public Task<ModerationAction?> GetLatestDecisionAsync(long applicationId, CancellationToken ct = default) =>
+        db.ModerationActions.AsNoTracking()
+            .Where(a => a.ApplicationId == applicationId &&
+                (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
+            .OrderByDescending(a => a.CreatedAt)
+            .FirstOrDefaultAsync(ct);
 }
 
 /// <summary>Enqueues into the same DbContext so the command commits with the state change.</summary>

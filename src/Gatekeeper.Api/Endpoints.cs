@@ -100,23 +100,37 @@ public static class ApplicationsEndpoints
             return Results.Ok(new NextQuestionDto(step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed));
         });
 
-        // Admin-group button press → decision. Data is "appr:{id}" or "rej:{id}".
-        group.MapPost("/callback", async (AdminCallbackRequest body, DecideApplicationHandler handler, CancellationToken ct) =>
+        // Admin-group button press. Data is "appr:{id}" / "rej:{id}" (decision) or
+        // "ans:{id}" / "hideans:{id}" (show/hide answers toggle on the card).
+        group.MapPost("/callback", async (
+            AdminCallbackRequest body, DecideApplicationHandler decideHandler,
+            ToggleCardAnswersHandler toggleHandler, CancellationToken ct) =>
         {
             var parts = body.Data.Split(':', 2);
             if (parts.Length != 2 || !long.TryParse(parts[1], out var appId))
                 return Results.BadRequest("Malformed callback data.");
 
-            try
+            switch (parts[0])
             {
-                await handler.HandleAsync(new DecideApplicationCommand(
-                    appId, parts[0] == "appr", null, body.ActingUserId, body.ActingUserName,
-                    ActionSource.TelegramGroup, ExpectedRowVersion: null), ct);
-                return Results.NoContent();
-            }
-            catch (ConcurrencyConflictException)
-            {
-                return Results.NoContent();  // already decided (likely from the website) — Telegram-side is authoritative
+                case "appr" or "rej":
+                    try
+                    {
+                        await decideHandler.HandleAsync(new DecideApplicationCommand(
+                            appId, parts[0] == "appr", null, body.ActingUserId, body.ActingUserName,
+                            ActionSource.TelegramGroup, ExpectedRowVersion: null), ct);
+                    }
+                    catch (ConcurrencyConflictException)
+                    {
+                        // already decided (likely from the website) — Telegram-side is authoritative
+                    }
+                    return Results.NoContent();
+
+                case "ans" or "hideans":
+                    await toggleHandler.HandleAsync(new ToggleCardAnswersCommand(appId, Show: parts[0] == "ans"), ct);
+                    return Results.NoContent();
+
+                default:
+                    return Results.BadRequest("Unknown callback action.");
             }
         });
 
@@ -142,7 +156,7 @@ public static class ApplicationsEndpoints
             {
                 users.TryGetValue(a.TelegramUserId, out var u);
                 return new ApplicationSummary(a.Id, a.TelegramUserId, u?.Username, Display(u),
-                    a.Status.ToString(), a.SubmittedAt);
+                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId);
             }).ToList();
 
             return Results.Ok(result);
@@ -165,7 +179,7 @@ public static class ApplicationsEndpoints
                 .ToList();
 
             return Results.Ok(new ApplicationCard(a.Id, a.TelegramUserId, u?.Username, Display(u),
-                a.Status.ToString(), a.CreatedAt, a.SubmittedAt, a.RowVersion, answers));
+                a.Status.ToString(), a.CreatedAt, a.SubmittedAt, a.RowVersion, answers, u?.Bio, u?.PhotoFileId));
         });
 
         return app;

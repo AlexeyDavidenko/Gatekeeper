@@ -77,6 +77,7 @@ public interface ITenantProvisioner
 public interface IModerationRepository
 {
     Task AddAsync(ModerationAction action, CancellationToken ct = default);
+    Task<ModerationAction?> GetLatestDecisionAsync(long applicationId, CancellationToken ct = default);
 }
 
 /// <summary>Adds an outbox command to the current unit of work; committed atomically with the change.</summary>

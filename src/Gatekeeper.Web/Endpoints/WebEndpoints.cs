@@ -6,6 +6,7 @@ using Gatekeeper.Web.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Telegram.Bot;
 
 public static class WebEndpoints
 {
@@ -49,6 +50,24 @@ public static class WebEndpoints
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
         });
+
+        // Avatar proxy: PhotoFileId is a Telegram-internal file_id, not a browser-usable URL —
+        // resolve it (getFile) and stream the bytes through, using the bot token server-side.
+        // Cached client-side since profile photos rarely change and a fresh getFile is a live API call.
+        app.MapGet("/avatar/{fileId}", async (string fileId, ITelegramBotClient bot, HttpContext ctx, CancellationToken ct) =>
+        {
+            try
+            {
+                using var stream = new MemoryStream();
+                await bot.GetInfoAndDownloadFile(fileId, stream, ct);
+                ctx.Response.Headers.CacheControl = "private, max-age=3600";
+                return Results.File(stream.ToArray(), "image/jpeg");
+            }
+            catch
+            {
+                return Results.NotFound();
+            }
+        }).RequireAuthorization();
 
         // Decision form posts — require auth + a valid antiforgery token.
         var apps = app.MapGroup("/applications").RequireAuthorization();
@@ -106,7 +125,7 @@ public static class WebEndpoints
 
         var (userId, name) = CurrentUser(ctx);
         var outcome = await api.DecideAsync(id, rowVersion, approve, form["reason"], userId, name, ct);
-        return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/?notice=conflict" : "/");
+        return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/queue?notice=conflict" : "/queue");
     }
 
     private static async Task ValidateAsync(IAntiforgery antiforgery, HttpContext ctx)

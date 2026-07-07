@@ -164,9 +164,11 @@ public sealed class OutboxDrainWorker(
                     if (cmd.MessageId is { } messageId)
                     {
                         if (cmd.IsPhotoCaption)
-                            await bot.EditMessageCaption(cmd.ChatId, (int)messageId, cmd.Text ?? "", cancellationToken: ct);
+                            await bot.EditMessageCaption(cmd.ChatId, (int)messageId, cmd.Text ?? "",
+                                replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
                         else
-                            await bot.EditMessageText(cmd.ChatId, (int)messageId, cmd.Text ?? "", cancellationToken: ct);
+                            await bot.EditMessageText(cmd.ChatId, (int)messageId, cmd.Text ?? "",
+                                replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
                     }
                     break;
                 case "BanUser":            await bot.BanChatMember(cmd.ChatId, cmd.UserId, cancellationToken: ct); break;
