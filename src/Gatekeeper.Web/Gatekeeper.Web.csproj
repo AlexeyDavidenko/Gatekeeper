@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Gatekeeper.Contracts\Gatekeeper.Contracts.csproj" />
+    <ProjectReference Include="..\Gatekeeper.ServiceDefaults\Gatekeeper.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

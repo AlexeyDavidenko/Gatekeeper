@@ -2,10 +2,13 @@ using Gatekeeper.Web.Auth;
 using Gatekeeper.Web.Components;
 using Gatekeeper.Web.Endpoints;
 using Gatekeeper.Web.Services;
+using Gatekeeper.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();   // Aspire: OTel, health checks, and — critically — HTTP service discovery + resilience
 
 builder.Services.AddRazorComponents();               // static SSR (no interactive render modes)
 builder.Services.AddCascadingAuthenticationState();  // exposes HttpContext.User to components
