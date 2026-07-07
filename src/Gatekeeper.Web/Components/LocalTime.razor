@@ -1,0 +1,12 @@
+@if (Value is null)
+{
+    <span>—</span>
+}
+else
+{
+    <span class="local-time" data-utc="@Value.Value.ToString("O")">@Value.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
+}
+
+@code {
+    [Parameter] public DateTimeOffset? Value { get; set; }
+}

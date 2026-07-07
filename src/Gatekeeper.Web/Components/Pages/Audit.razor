@@ -22,7 +22,7 @@ else
             @foreach (var e in _log)
             {
                 <tr>
-                    <td>@e.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td><LocalTime Value="e.CreatedAt" /></td>
                     <td>@(e.DisplayName ?? "—") @(e.Username is null ? "" : $"(@{e.Username})")</td>
                     <td>@e.Action</td>
                     <td>@(e.Reason ?? "—")</td>

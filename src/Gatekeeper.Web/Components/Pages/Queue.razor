@@ -24,7 +24,7 @@ else
                 <tr>
                     <td>@a.Id</td>
                     <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
-                    <td>@(a.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                    <td><LocalTime Value="a.SubmittedAt" /></td>
                     <td><a href="applications/@a.Id">Открыть</a></td>
                 </tr>
             }

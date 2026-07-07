@@ -38,6 +38,7 @@ builder.Services.AddHttpClient<AdminApiClient>(http =>
 
 var app = builder.Build();
 
+app.UseStaticFiles();          // wwwroot/* (localtime.js, app.css) — was missing entirely, so these 404'd
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
