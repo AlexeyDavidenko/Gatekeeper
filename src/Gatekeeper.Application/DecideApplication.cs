@@ -75,8 +75,7 @@ public sealed class DecideApplicationHandler(
             if (adminChatId is { } chatId)
             {
                 var user = await users.GetByTelegramIdAsync(application.TelegramUserId, ct);
-                var header = AdminCardText.BuildHeader(
-                    application.Id, user?.Username, user?.FirstName, user?.LastName, application.SubmittedAt);
+                var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName);
                 var verdict = cmd.Approve ? "✅ Approved" : "❌ Rejected";
                 var by = cmd.ActingUserName ?? cmd.ActingUserId.ToString();
                 var text = $"{header}\n\n{verdict} by {by}";

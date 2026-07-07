@@ -6,13 +6,11 @@ namespace Gatekeeper.Application;
 /// </summary>
 public static class AdminCardText
 {
-    public static string BuildHeader(
-        long applicationId, string? username, string? firstName, string? lastName, DateTimeOffset? submittedAt)
+    public static string BuildHeader(long applicationId, string? username, string? firstName, string? lastName)
     {
         var name = $"{firstName} {lastName}".Trim();
         if (name.Length == 0) name = "—";
         var usernamePart = username is null ? "" : $" (@{username})";
-        var submitted = submittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—";
-        return $"📋 New application #{applicationId}\n👤 {name}{usernamePart}\n📅 Submitted: {submitted} UTC";
+        return $"📋 New application #{applicationId}\n👤 {name}{usernamePart}";
     }
 }
