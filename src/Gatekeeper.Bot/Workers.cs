@@ -60,10 +60,21 @@ public sealed class TelegramUpdateWorker(
                 if (t is null) break;
                 router.Remember(jr.From.Id, t.Value.TenantId);
 
+                string? photoFileId = null;
+                try
+                {
+                    var photos = await bot.GetUserProfilePhotos(jr.From.Id, limit: 1, cancellationToken: ct);
+                    photoFileId = photos.Photos.Length > 0 ? photos.Photos[0][^1].FileId : null;
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "Failed to fetch profile photo for user {UserId}", jr.From.Id);
+                }
+
                 var first = await api.CreateApplicationAsync(t.Value.TenantId, new CreateApplicationRequest(
                     jr.Chat.Id,
                     new TelegramUserDto(jr.From.Id, jr.From.IsBot, jr.From.IsPremium,
-                        jr.From.Username, jr.From.FirstName, jr.From.LastName, jr.From.LanguageCode),
+                        jr.From.Username, jr.From.FirstName, jr.From.LastName, jr.From.LanguageCode, photoFileId),
                     jr.UserChatId, jr.InviteLink?.InviteLink, jr.Bio), ct);
 
                 if (first.Prompt is not null)
@@ -141,13 +152,22 @@ public sealed class OutboxDrainWorker(
                     await bot.SendMessage(cmd.ChatId, cmd.Text ?? "", replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
                     break;
                 case "SendAdminCard":
-                    // Same as SendMessage, but the caller needs the message_id back to edit this card later.
-                    var sent = await bot.SendMessage(cmd.ChatId, cmd.Text ?? "", replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
+                    // Same idea as SendMessage, but the caller needs the message_id back to edit this
+                    // card later — and a photo (the applicant's profile pic) needs SendPhoto instead.
+                    var sent = cmd.PhotoFileId is { } photoId
+                        ? await bot.SendPhoto(cmd.ChatId, InputFile.FromFileId(photoId), caption: cmd.Text,
+                            replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct)
+                        : await bot.SendMessage(cmd.ChatId, cmd.Text ?? "", replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
                     sentMessageId = sent.MessageId;
                     break;
                 case "EditMessage":
                     if (cmd.MessageId is { } messageId)
-                        await bot.EditMessageText(cmd.ChatId, (int)messageId, cmd.Text ?? "", cancellationToken: ct);
+                    {
+                        if (cmd.IsPhotoCaption)
+                            await bot.EditMessageCaption(cmd.ChatId, (int)messageId, cmd.Text ?? "", cancellationToken: ct);
+                        else
+                            await bot.EditMessageText(cmd.ChatId, (int)messageId, cmd.Text ?? "", cancellationToken: ct);
+                    }
                     break;
                 case "BanUser":            await bot.BanChatMember(cmd.ChatId, cmd.UserId, cancellationToken: ct); break;
                 case "UnbanUser":          await bot.UnbanChatMember(cmd.ChatId, cmd.UserId, cancellationToken: ct); break;

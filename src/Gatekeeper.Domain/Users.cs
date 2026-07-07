@@ -29,8 +29,8 @@ public sealed class TelegramUser : AggregateRoot
 
     public static TelegramUser FirstSighting(
         long telegramUserId, bool isBot, bool isPremium, string? username, string? firstName,
-        string? lastName, string? languageCode, string? bio, Func<string?, string?, string> normalize,
-        DateTimeOffset now)
+        string? lastName, string? languageCode, string? bio, string? photoFileId,
+        Func<string?, string?, string> normalize, DateTimeOffset now)
     {
         var user = new TelegramUser
         {
@@ -40,7 +40,7 @@ public sealed class TelegramUser : AggregateRoot
             LanguageCode = languageCode,
             FirstSeenAt = now,
         };
-        user.RecordSighting(username, firstName, lastName, bio, photoFileId: null, source: "first_seen", normalize, now);
+        user.RecordSighting(username, firstName, lastName, bio, photoFileId, source: "first_seen", normalize, now);
         return user;
     }
 

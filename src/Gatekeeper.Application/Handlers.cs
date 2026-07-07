@@ -9,7 +9,7 @@ namespace Gatekeeper.Application;
 public sealed record CreateApplicationCommand(
     long ChatId, long TelegramUserId, bool IsBot, bool IsPremium,
     string? Username, string? FirstName, string? LastName, string? LanguageCode,
-    long? UserChatId, string? InviteLink, string? Bio);
+    long? UserChatId, string? InviteLink, string? Bio, string? PhotoFileId = null);
  
 /// <summary>The first question (or completion) returned to the bot to DM the applicant.</summary>
 public sealed record FirstQuestion(long? QuestionId, string Prompt, string Type, bool Completed);
@@ -29,11 +29,11 @@ public sealed class CreateApplicationHandler(
         if (user is null)
         {
             user = TelegramUser.FirstSighting(cmd.TelegramUserId, cmd.IsBot, cmd.IsPremium,
-                cmd.Username, cmd.FirstName, cmd.LastName, cmd.LanguageCode, cmd.Bio, Normalize, now);
+                cmd.Username, cmd.FirstName, cmd.LastName, cmd.LanguageCode, cmd.Bio, cmd.PhotoFileId, Normalize, now);
             await users.AddAsync(user, ct);
         }
         var snapshot = user.RecordSighting(cmd.Username, cmd.FirstName, cmd.LastName, cmd.Bio,
-            photoFileId: null, source: "join_request", Normalize, now);
+            cmd.PhotoFileId, source: "join_request", Normalize, now);
  
         var application = Domain.Application.FromJoinRequest(cmd.TelegramUserId, cmd.ChatId, cmd.UserChatId, cmd.InviteLink, now);
         await applications.AddAsync(application, ct);
@@ -63,6 +63,7 @@ public sealed record NextStep(long? QuestionId, string? Prompt, string? Type, bo
 public sealed class SubmitAnswerHandler(
     IApplicationRepository applications,
     IQuestionRepository questions,
+    IUserRepository users,
     ITelegramCommandQueue queue,
     ITenantDirectory directory,
     ITenantContext tenant,
@@ -100,9 +101,14 @@ public sealed class SubmitAnswerHandler(
             var adminChatId = await directory.GetAdminChatIdAsync(tenant.TenantId, ct)
                 ?? throw new InvalidOperationException("Admin chat is not configured for this tenant.");
  
+            var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+            var header = AdminCardText.BuildHeader(
+                application.Id, user?.Username, user?.FirstName, user?.LastName, application.SubmittedAt);
+
             var payload = new TelegramCommandPayload(
                 ChatId: adminChatId,
-                Text: $"New application #{application.Id} from user {cmd.TelegramUserId} is ready for review.",
+                Text: header,
+                PhotoFileId: user?.PhotoFileId,
                 Buttons: [
                     new TelegramButton("✅ Approve", $"appr:{application.Id}"),
                     new TelegramButton("❌ Reject", $"rej:{application.Id}"),

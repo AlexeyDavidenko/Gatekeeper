@@ -2,6 +2,7 @@ using Gatekeeper.Domain;
 
 namespace Gatekeeper.Application.Applications;
 
+using Gatekeeper.Application;
 using Gatekeeper.Domain.Outbox;
 using System.Text.Json;
 
@@ -25,6 +26,7 @@ public sealed class DecideApplicationHandler(
     ITelegramCommandQueue queue,
     ITenantDirectory directory,
     ITenantContext tenant,
+    IUserRepository users,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
@@ -72,12 +74,17 @@ public sealed class DecideApplicationHandler(
             var adminChatId = await directory.GetAdminChatIdAsync(tenant.TenantId, ct);
             if (adminChatId is { } chatId)
             {
-                var verdict = cmd.Approve ? "✅ принято" : "❌ отклонено";
+                var user = await users.GetByTelegramIdAsync(application.TelegramUserId, ct);
+                var header = AdminCardText.BuildHeader(
+                    application.Id, user?.Username, user?.FirstName, user?.LastName, application.SubmittedAt);
+                var verdict = cmd.Approve ? "✅ Approved" : "❌ Rejected";
                 var by = cmd.ActingUserName ?? cmd.ActingUserId.ToString();
+                var text = $"{header}\n\n{verdict} by {by}";
+
                 queue.Enqueue(TelegramCommand.Enqueue(
                     TelegramCommandType.EditMessage,
                     JsonSerializer.Serialize(new TelegramCommandPayload(
-                        ChatId: chatId, MessageId: cardMessageId, Text: $"{verdict} by {by}")),
+                        ChatId: chatId, MessageId: cardMessageId, Text: text, IsPhotoCaption: application.AdminCardHasPhoto)),
                     application.Id, application.TelegramUserId, now));
             }
         }

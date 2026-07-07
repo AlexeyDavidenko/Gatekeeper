@@ -5,7 +5,7 @@ namespace Gatekeeper.Contracts;
 
 public sealed record TelegramUserDto(
     long Id, bool IsBot, bool IsPremium, string? Username,
-    string? FirstName, string? LastName, string? LanguageCode);
+    string? FirstName, string? LastName, string? LanguageCode, string? PhotoFileId = null);
 
 public sealed record CreateApplicationRequest(
     long ChatId, TelegramUserDto User, long? UserChatId, string? InviteLink, string? Bio);
@@ -49,7 +49,7 @@ public sealed record ProvisionTenantResponse(long TenantId, string DatabaseName,
 
 public sealed record PendingCommand(
     long TenantId, long CommandId, string Type, long ChatId, long UserId, string? Text, long? MessageId,
-    IReadOnlyList<CommandButton>? Buttons);
+    IReadOnlyList<CommandButton>? Buttons, string? PhotoFileId = null, bool IsPhotoCaption = false);
 
 public sealed record CommandButton(string Text, string CallbackData);
 

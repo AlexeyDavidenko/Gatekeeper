@@ -60,6 +60,8 @@ public sealed record TelegramCommandPayload(
     long? UserId = null,
     long? MessageId = null,
     string? Text = null,
-    IReadOnlyList<TelegramButton>? Buttons = null);
+    IReadOnlyList<TelegramButton>? Buttons = null,
+    string? PhotoFileId = null,
+    bool IsPhotoCaption = false);
 
 public sealed record TelegramButton(string Text, string CallbackData);

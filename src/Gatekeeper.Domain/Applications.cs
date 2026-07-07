@@ -19,6 +19,7 @@ public sealed class Application : AggregateRoot
     public DateTimeOffset? SubmittedAt { get; private set; }
     public DateTimeOffset? DecidedAt { get; private set; }
     public long? AdminCardMessageId { get; private set; }  // message_id of the moderation card in the admin chat
+    public bool AdminCardHasPhoto { get; private set; }     // true if the card is a photo (caption edits, not text edits)
     public uint RowVersion { get; private set; }       // concurrency token (xmin)
 
     public SurveySession? Session { get; private set; }
@@ -39,7 +40,11 @@ public sealed class Application : AggregateRoot
 
     public void LinkIdentitySnapshot(long snapshotId) => IdentitySnapshotId = snapshotId;
 
-    public void SetAdminCardMessageId(long messageId) => AdminCardMessageId = messageId;
+    public void SetAdminCardMessageId(long messageId, bool hasPhoto)
+    {
+        AdminCardMessageId = messageId;
+        AdminCardHasPhoto = hasPhoto;
+    }
 
     public void MarkSurveyOffered() => Transition(ApplicationStatus.JoinRequested, ApplicationStatus.SurveyOffered);
 

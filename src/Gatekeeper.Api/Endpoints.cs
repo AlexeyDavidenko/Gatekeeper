@@ -89,7 +89,7 @@ public static class ApplicationsEndpoints
             var first = await handler.HandleAsync(new CreateApplicationCommand(
                 body.ChatId, body.User.Id, body.User.IsBot, body.User.IsPremium,
                 body.User.Username, body.User.FirstName, body.User.LastName, body.User.LanguageCode,
-                body.UserChatId, body.InviteLink, body.Bio), ct);
+                body.UserChatId, body.InviteLink, body.Bio, body.User.PhotoFileId), ct);
             return Results.Ok(new NextQuestionDto(first.QuestionId, first.Prompt, first.Type, first.Completed));
         });
 
@@ -263,7 +263,8 @@ public static class InternalEndpoints
                     result.Add(new PendingCommand(
                         tenant.Id, cmd.Id, cmd.Type.ToString(),
                         p.ChatId ?? 0, p.UserId ?? 0, p.Text, p.MessageId,
-                        p.Buttons?.Select(b => new CommandButton(b.Text, b.CallbackData)).ToList()));
+                        p.Buttons?.Select(b => new CommandButton(b.Text, b.CallbackData)).ToList(),
+                        p.PhotoFileId, p.IsPhotoCaption));
                 }
             }
 
@@ -290,7 +291,8 @@ public static class InternalEndpoints
                 if (cmd.Type == TelegramCommandType.SendAdminCard && body.MessageId is { } messageId && cmd.ApplicationId is { } applicationId)
                 {
                     var application = await db.Applications.FirstOrDefaultAsync(a => a.Id == applicationId, ct);
-                    application?.SetAdminCardMessageId(messageId);
+                    var payload = JsonSerializer.Deserialize<TelegramCommandPayload>(cmd.PayloadJson)!;
+                    application?.SetAdminCardMessageId(messageId, hasPhoto: payload.PhotoFileId is not null);
                 }
             }
             else cmd.MarkFailed(body.Error ?? "unknown", DateTimeOffset.UtcNow);
