@@ -146,3 +146,134 @@ jobs:
       - name: Stop API
         if: always()
         run: kill "$(cat api.pid)" 2>/dev/null || true
+
+  # Determines which of api/bot/web need rebuilding. A change under a project's own folder always
+  # triggers it; a change under a shared dependency (Contracts, ServiceDefaults — or Domain/
+  # Application/Infrastructure, which only Api depends on) triggers everything that references it.
+  changes:
+    needs: build-and-verify-migrations
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.compute.outputs.services }}
+      service_names: ${{ steps.compute.outputs.service_names }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'src/Gatekeeper.Api/**'
+              - 'src/Gatekeeper.Domain/**'
+              - 'src/Gatekeeper.Application/**'
+              - 'src/Gatekeeper.Infrastructure/**'
+              - 'src/Gatekeeper.Contracts/**'
+              - 'src/Gatekeeper.ServiceDefaults/**'
+            bot:
+              - 'src/Gatekeeper.Bot/**'
+              - 'src/Gatekeeper.Contracts/**'
+              - 'src/Gatekeeper.ServiceDefaults/**'
+            web:
+              - 'src/Gatekeeper.Web/**'
+              - 'src/Gatekeeper.Contracts/**'
+              - 'src/Gatekeeper.ServiceDefaults/**'
+
+      - id: compute
+        run: |
+          declare -a entries=()
+          declare -a names=()
+          if [ "${{ steps.filter.outputs.api }}" = "true" ]; then
+            entries+=('{"name":"api","project":"Api"}'); names+=("api")
+          fi
+          if [ "${{ steps.filter.outputs.bot }}" = "true" ]; then
+            entries+=('{"name":"bot","project":"Bot"}'); names+=("bot")
+          fi
+          if [ "${{ steps.filter.outputs.web }}" = "true" ]; then
+            entries+=('{"name":"web","project":"Web"}'); names+=("web")
+          fi
+          json=$(IFS=,; echo "[${entries[*]}]")
+          echo "services=$json" >> "$GITHUB_OUTPUT"
+          echo "service_names=${names[*]}" >> "$GITHUB_OUTPUT"
+          echo "Changed services: ${names[*]:-none}"
+
+  # Builds only the services `changes` flagged, straight to GHCR (ubuntu-latest runners are
+  # linux/amd64 natively — same arch as the prod server, no cross-compilation needed).
+  build-and-push:
+    needs: changes
+    if: needs.changes.outputs.service_names != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push ${{ matrix.service.name }}
+        run: >-
+          dotnet publish src/Gatekeeper.${{ matrix.service.project }}
+          -t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=alexeydavidenko/gatekeeper-${{ matrix.service.name }}
+          -p:ContainerImageTag=latest
+          --os linux --arch x64
+
+  # Deploys straight to the home server via the Cloudflare Access-protected SSH tunnel (the box is
+  # otherwise only reachable on the local network). Auth is a Service Token scoped to exactly this
+  # hostname — separate from the maintainer's own email-OTP login — plus a dedicated SSH key that
+  # exists alongside (not instead of) the account's normal password.
+  deploy:
+    needs: [changes, build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cloudflared
+        run: |
+          curl -sL --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Set up deploy key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Open the Access tunnel
+        run: |
+          cloudflared access ssh --hostname ssh.cerberuslab.dev --url localhost:2222 \
+            --service-token-id "${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            --service-token-secret "${{ secrets.CF_ACCESS_CLIENT_SECRET }}" &
+          sleep 3
+
+      # Pulls and sanity-checks images one at a time, never in parallel — a past deploy on this
+      # exact box corrupted images pulled concurrently (exec format error despite a correct
+      # manifest architecture); see docs/changelog.md 2026-07-07. Only recreates the containers
+      # that actually changed.
+      - name: Deploy changed services
+        run: |
+          set -euo pipefail
+          ssh_cmd() { ssh -p 2222 -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=15 cerberus@localhost "$@"; }
+
+          for svc in ${{ needs.changes.outputs.service_names }}; do
+            echo "::group::Pulling gatekeeper-$svc"
+            ssh_cmd "docker pull ghcr.io/alexeydavidenko/gatekeeper-$svc:latest"
+            echo "::endgroup::"
+
+            echo "::group::Sanity-checking gatekeeper-$svc"
+            ssh_cmd "docker run --rm --entrypoint dotnet ghcr.io/alexeydavidenko/gatekeeper-$svc:latest --info" | head -3
+            echo "::endgroup::"
+          done
+
+          echo "::group::Recreating containers"
+          ssh_cmd "docker compose -f ~/gatekeeper-deploy/docker-compose.yaml --project-directory ~/gatekeeper-deploy up -d ${{ needs.changes.outputs.service_names }}"
+          echo "::endgroup::"
