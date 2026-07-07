@@ -1,0 +1,63 @@
+@page "/"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<h1>Дашборд</h1>
+
+@if (_summary is null)
+{
+    <p>Загрузка…</p>
+}
+else
+{
+    <div class="cards">
+        <div class="card">
+            <div class="card-value">@_summary.PendingCount</div>
+            <div class="card-label">Ждут решения</div>
+            <a href="/queue">К очереди →</a>
+        </div>
+        <div class="card">
+            <div class="card-value">@_summary.ApprovedToday / @_summary.RejectedToday</div>
+            <div class="card-label">Одобрено / отклонено сегодня</div>
+        </div>
+        <div class="card">
+            <div class="card-value">@_summary.ApprovedWeek / @_summary.RejectedWeek</div>
+            <div class="card-label">Одобрено / отклонено за 7 дней</div>
+        </div>
+        <div class="card @(_summary.OutboxFailed > 0 ? "card-warn" : "")">
+            <div class="card-value">@_summary.OutboxPending / @_summary.OutboxInFlight / @_summary.OutboxFailed</div>
+            <div class="card-label">Outbox: ожидают / в полёте / ошибки</div>
+        </div>
+    </div>
+
+    <h2>Последние решения</h2>
+    @if (_summary.RecentDecisions.Count == 0)
+    {
+        <p class="muted">Пока нет решений.</p>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+                <tr><th>Когда</th><th>Пользователь</th><th>Действие</th><th>Кто решил</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var d in _summary.RecentDecisions)
+                {
+                    <tr>
+                        <td><LocalTime Value="d.CreatedAt" /></td>
+                        <td>@(d.DisplayName ?? "—") @(d.Username is null ? "" : $"(@{d.Username})")</td>
+                        <td>@(d.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</td>
+                        <td>@(d.PerformedByName ?? d.PerformedByUserId.ToString())</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private DashboardSummary? _summary;
+
+    protected override async Task OnInitializedAsync() => _summary = await Api.GetDashboardAsync();
+}

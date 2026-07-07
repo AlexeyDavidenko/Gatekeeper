@@ -5,7 +5,8 @@
         <a class="brand" href="/">Gatekeeper</a>
         <AuthorizeView>
             <Authorized>
-                <a class="nav" href="/">Очередь</a>
+                <a class="nav" href="/">Дашборд</a>
+                <a class="nav" href="/queue">Очередь</a>
                 <a class="nav" href="/questions">Вопросы</a>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>

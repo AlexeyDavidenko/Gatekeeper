@@ -26,6 +26,14 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         return await res.Content.ReadFromJsonAsync<ApplicationCard>(ct);
     }
 
+    public async Task<DashboardSummary> GetDashboardAsync(CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get("/dashboard"), ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<DashboardSummary>(ct)
+            ?? new DashboardSummary(0, 0, 0, 0, 0, 0, 0, 0, []);
+    }
+
     public async Task<IReadOnlyList<ModerationLogEntry>> GetAuditLogAsync(CancellationToken ct = default)
     {
         using var res = await http.SendAsync(Get("/moderation"), ct);

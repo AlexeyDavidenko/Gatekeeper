@@ -67,5 +67,6 @@ app.MapApplicationsEndpoints();
 app.MapModerationEndpoints();
 app.MapInternalEndpoints();                       // tenant resolve + outbox drain (tenant-agnostic)
 app.MapQuestionsEndpoints();
+app.MapDashboardEndpoints();
 
 app.Run();

@@ -48,6 +48,13 @@ public sealed record ModerationLogEntry(
     string Action, string? Reason, string? Notes, long PerformedByUserId, string? PerformedByName,
     string Source, DateTimeOffset CreatedAt);
 
+public sealed record DashboardSummary(
+    int PendingCount,
+    int ApprovedToday, int RejectedToday,
+    int ApprovedWeek, int RejectedWeek,
+    int OutboxPending, int OutboxInFlight, int OutboxFailed,
+    IReadOnlyList<ModerationLogEntry> RecentDecisions);
+
 // --- Tenant provisioning (control-plane, tenant-agnostic) ---
 
 public sealed record ProvisionTenantRequest(

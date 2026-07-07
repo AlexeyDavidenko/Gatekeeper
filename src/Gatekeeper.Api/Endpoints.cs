@@ -276,6 +276,65 @@ public static class ModerationEndpoints
     }
 }
 
+public static class DashboardEndpoints
+{
+    public static IEndpointRouteBuilder MapDashboardEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/dashboard", async (TenantDbContext db, IClock clock, CancellationToken ct) =>
+        {
+            var now = clock.UtcNow;
+            var todayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
+            var weekStart = todayStart.AddDays(-7);
+
+            var pendingCount = await db.Applications.AsNoTracking()
+                .CountAsync(a => a.Status == ApplicationStatus.AwaitingReview, ct);
+
+            var decisions = await db.ModerationActions.AsNoTracking()
+                .Where(a => a.CreatedAt >= weekStart &&
+                    (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
+                .ToListAsync(ct);
+
+            var approvedToday = decisions.Count(a => a.CreatedAt >= todayStart && a.Action == ModerationActionType.Approve);
+            var rejectedToday = decisions.Count(a => a.CreatedAt >= todayStart && a.Action == ModerationActionType.Reject);
+            var approvedWeek = decisions.Count(a => a.Action == ModerationActionType.Approve);
+            var rejectedWeek = decisions.Count(a => a.Action == ModerationActionType.Reject);
+
+            var outboxPending = await db.TelegramCommands.AsNoTracking()
+                .CountAsync(c => c.Status == TelegramCommandStatus.Pending, ct);
+            var outboxInFlight = await db.TelegramCommands.AsNoTracking()
+                .CountAsync(c => c.Status == TelegramCommandStatus.InFlight, ct);
+            var outboxFailed = await db.TelegramCommands.AsNoTracking()
+                .CountAsync(c => c.Status == TelegramCommandStatus.Failed, ct);
+
+            var recent = await db.ModerationActions.AsNoTracking()
+                .Where(a => a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject)
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(10)
+                .ToListAsync(ct);
+
+            var ids = recent.Select(a => a.TelegramUserId).Distinct().ToList();
+            var users = await db.Users.AsNoTracking()
+                .Where(u => ids.Contains(u.TelegramUserId))
+                .ToDictionaryAsync(u => u.TelegramUserId, ct);
+
+            var recentDtos = recent.Select(a =>
+            {
+                users.TryGetValue(a.TelegramUserId, out var u);
+                return new ModerationLogEntry(
+                    a.Id, a.TelegramUserId, u?.Username, ApplicationsEndpoints.Display(u), a.ApplicationId,
+                    a.Action.ToString(), a.Reason, a.Notes, a.PerformedByUserId, a.PerformedByName,
+                    a.Source.ToString(), a.CreatedAt);
+            }).ToList();
+
+            return Results.Ok(new DashboardSummary(
+                pendingCount, approvedToday, rejectedToday, approvedWeek, rejectedWeek,
+                outboxPending, outboxInFlight, outboxFailed, recentDtos));
+        });
+
+        return app;
+    }
+}
+
 public static class InternalEndpoints
 {
     // Tenant-agnostic control-plane surface (the tenant middleware skips /internal).
