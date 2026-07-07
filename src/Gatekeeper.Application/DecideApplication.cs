@@ -64,7 +64,7 @@ public sealed class DecideApplicationHandler(
             TelegramCommandType.SendMessage,
             JsonSerializer.Serialize(new TelegramCommandPayload(
                 ChatId: application.TelegramUserId,
-                Text: cmd.Approve ? "You're approved — welcome!" : "Your application was declined.")),
+                Text: cmd.Approve ? "✅ Ваша заявка одобрена, добро пожаловать!" : "❌ Ваша заявка отклонена.")),
             application.Id, application.TelegramUserId, now));
 
         // 3) Reflect the decision on the moderation card, if the outbox drain already reported its

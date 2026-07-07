@@ -23,7 +23,7 @@ else
             {
                 <tr>
                     <td>@a.Id</td>
-                    <td><Avatar PhotoFileId="a.PhotoFileId" DisplayName="a.DisplayName" Username="a.Username" /></td>
+                    <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
                     <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
                     <td><LocalTime Value="a.SubmittedAt" /></td>
                     <td><a href="applications/@a.Id">Открыть</a></td>

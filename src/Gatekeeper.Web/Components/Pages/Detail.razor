@@ -12,7 +12,7 @@ else
 {
     <h1>Заявка #@_card.Id</h1>
     <p>
-        <Avatar PhotoFileId="_card.PhotoFileId" DisplayName="_card.DisplayName" Username="_card.Username" Large="true" />
+        <Avatar PhotoFileId="@_card.PhotoFileId" DisplayName="@_card.DisplayName" Username="@_card.Username" Large="true" />
         @(_card.DisplayName ?? "—") @(_card.Username is null ? "" : $"(@{_card.Username})")
     </p>
     <p class="muted">статус: @_card.Status</p>
