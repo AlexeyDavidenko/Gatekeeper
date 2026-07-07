@@ -18,6 +18,7 @@ public sealed class Application : AggregateRoot
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? SubmittedAt { get; private set; }
     public DateTimeOffset? DecidedAt { get; private set; }
+    public long? AdminCardMessageId { get; private set; }  // message_id of the moderation card in the admin chat
     public uint RowVersion { get; private set; }       // concurrency token (xmin)
 
     public SurveySession? Session { get; private set; }
@@ -37,6 +38,8 @@ public sealed class Application : AggregateRoot
     };
 
     public void LinkIdentitySnapshot(long snapshotId) => IdentitySnapshotId = snapshotId;
+
+    public void SetAdminCardMessageId(long messageId) => AdminCardMessageId = messageId;
 
     public void MarkSurveyOffered() => Transition(ApplicationStatus.JoinRequested, ApplicationStatus.SurveyOffered);
 

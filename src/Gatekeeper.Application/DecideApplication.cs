@@ -23,6 +23,8 @@ public sealed class DecideApplicationHandler(
     IApplicationRepository applications,
     IModerationRepository moderation,
     ITelegramCommandQueue queue,
+    ITenantDirectory directory,
+    ITenantContext tenant,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
@@ -63,7 +65,24 @@ public sealed class DecideApplicationHandler(
                 Text: cmd.Approve ? "You're approved — welcome!" : "Your application was declined.")),
             application.Id, application.TelegramUserId, now));
 
-        // 3) Commit atomically. A concurrent decision bumps xmin → DbUpdateConcurrencyException,
+        // 3) Reflect the decision on the moderation card, if the outbox drain already reported its
+        //    message_id back — best-effort, skipped silently if it hasn't (yet).
+        if (application.AdminCardMessageId is { } cardMessageId)
+        {
+            var adminChatId = await directory.GetAdminChatIdAsync(tenant.TenantId, ct);
+            if (adminChatId is { } chatId)
+            {
+                var verdict = cmd.Approve ? "✅ принято" : "❌ отклонено";
+                var by = cmd.ActingUserName ?? cmd.ActingUserId.ToString();
+                queue.Enqueue(TelegramCommand.Enqueue(
+                    TelegramCommandType.EditMessage,
+                    JsonSerializer.Serialize(new TelegramCommandPayload(
+                        ChatId: chatId, MessageId: cardMessageId, Text: $"{verdict} by {by}")),
+                    application.Id, application.TelegramUserId, now));
+            }
+        }
+
+        // 4) Commit atomically. A concurrent decision bumps xmin → DbUpdateConcurrencyException,
         //    surfaced as ConcurrencyConflictException by the repository/SaveChanges wrapper.
         await unitOfWork.SaveChangesAsync(ct);
     }

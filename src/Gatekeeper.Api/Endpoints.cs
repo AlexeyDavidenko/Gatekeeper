@@ -262,7 +262,17 @@ public static class InternalEndpoints
             var cmd = await db.TelegramCommands.FirstOrDefaultAsync(c => c.Id == commandId, ct);
             if (cmd is null) return Results.NotFound();
 
-            if (body.Success) cmd.MarkSucceeded(DateTimeOffset.UtcNow);
+            if (body.Success)
+            {
+                cmd.MarkSucceeded(DateTimeOffset.UtcNow);
+
+                // The moderation card's message_id — captured so a later decision can EditMessage it.
+                if (cmd.Type == TelegramCommandType.SendAdminCard && body.MessageId is { } messageId && cmd.ApplicationId is { } applicationId)
+                {
+                    var application = await db.Applications.FirstOrDefaultAsync(a => a.Id == applicationId, ct);
+                    application?.SetAdminCardMessageId(messageId);
+                }
+            }
             else cmd.MarkFailed(body.Error ?? "unknown", DateTimeOffset.UtcNow);
             await db.SaveChangesAsync(ct);
 

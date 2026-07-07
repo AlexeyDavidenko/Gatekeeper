@@ -108,12 +108,18 @@ public sealed class OutboxDrainWorker(
     {
         try
         {
+            long? sentMessageId = null;
             switch (cmd.Type)
             {
                 case "ApproveJoinRequest": await bot.ApproveChatJoinRequest(cmd.ChatId, cmd.UserId, ct); break;
                 case "DeclineJoinRequest": await bot.DeclineChatJoinRequest(cmd.ChatId, cmd.UserId, ct); break;
                 case "SendMessage":
                     await bot.SendMessage(cmd.ChatId, cmd.Text ?? "", replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
+                    break;
+                case "SendAdminCard":
+                    // Same as SendMessage, but the caller needs the message_id back to edit this card later.
+                    var sent = await bot.SendMessage(cmd.ChatId, cmd.Text ?? "", replyMarkup: Keyboard(cmd.Buttons), cancellationToken: ct);
+                    sentMessageId = sent.MessageId;
                     break;
                 case "EditMessage":
                     if (cmd.MessageId is { } messageId)
@@ -124,7 +130,7 @@ public sealed class OutboxDrainWorker(
                 case "RestrictUser":       await bot.RestrictChatMember(cmd.ChatId, cmd.UserId, new ChatPermissions(), cancellationToken: ct); break;
                 default:                   return new CommandResult(false, $"Unknown command type {cmd.Type}");
             }
-            return new CommandResult(true, null);
+            return new CommandResult(true, null, sentMessageId);
         }
         catch (Exception ex)
         {

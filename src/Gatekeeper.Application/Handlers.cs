@@ -107,7 +107,7 @@ public sealed class SubmitAnswerHandler(
                     new TelegramButton("✅ Approve", $"appr:{application.Id}"),
                     new TelegramButton("❌ Reject", $"rej:{application.Id}"),
                 ]);
-            queue.Enqueue(TelegramCommand.Enqueue(TelegramCommandType.SendMessage,
+            queue.Enqueue(TelegramCommand.Enqueue(TelegramCommandType.SendAdminCard,
                 JsonSerializer.Serialize(payload), application.Id, cmd.TelegramUserId, now));
         }
  

@@ -66,6 +66,7 @@ public enum TelegramCommandType
     BanUser,
     UnbanUser,
     RestrictUser,
+    SendAdminCard,  // appended, not inserted — preserves existing numeric values already persisted
 }
 
 public enum TelegramCommandStatus

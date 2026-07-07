@@ -53,7 +53,7 @@ public sealed record PendingCommand(
 
 public sealed record CommandButton(string Text, string CallbackData);
 
-public sealed record CommandResult(bool Success, string? Error);
+public sealed record CommandResult(bool Success, string? Error, long? MessageId = null);
 
 /// <summary>The only surface Bot and Web use to reach data — they never touch the database.</summary>
 public interface IGatekeeperApiClient
