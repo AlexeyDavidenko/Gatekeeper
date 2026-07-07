@@ -17,6 +17,9 @@ public sealed class TelegramUpdateWorker(
     TenantRouter router,
     ILogger<TelegramUpdateWorker> log) : BackgroundService
 {
+    private const string WelcomeMessage = "👋 Welcome! Please answer a few quick questions to complete your application.";
+    private const string ThankYouMessage = "🙏 Thank you for your answers! Your application has been received and will be reviewed shortly.";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await RehydrateRouterAsync(stoppingToken);
@@ -77,6 +80,11 @@ public sealed class TelegramUpdateWorker(
                         jr.From.Username, jr.From.FirstName, jr.From.LastName, jr.From.LanguageCode, photoFileId),
                     jr.UserChatId, jr.InviteLink?.InviteLink, jr.Bio), ct);
 
+                // The no-questions-configured fallback prompt already reads as a welcome on its own —
+                // only prepend a distinct greeting when there's a real first question to lead into.
+                if (first.QuestionId is not null)
+                    await bot.SendMessage(jr.From.Id, WelcomeMessage, cancellationToken: ct);
+
                 if (first.Prompt is not null)
                     await bot.SendMessage(jr.From.Id, first.Prompt, cancellationToken: ct);
                 break;
@@ -86,7 +94,11 @@ public sealed class TelegramUpdateWorker(
             {
                 if (router.Resolve(from.Id) is not { } tenantId) break;  // no active survey for this user
                 var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(from.Id, msg.Text), ct);
-                if (next.Completed) router.Forget(from.Id);
+                if (next.Completed)
+                {
+                    router.Forget(from.Id);
+                    await bot.SendMessage(from.Id, ThankYouMessage, cancellationToken: ct);
+                }
                 else if (next.Prompt is not null) await bot.SendMessage(from.Id, next.Prompt, cancellationToken: ct);
                 break;
             }
