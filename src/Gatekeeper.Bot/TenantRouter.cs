@@ -5,8 +5,9 @@ using System.Collections.Concurrent;
 /// <summary>
 /// Remembers which community an applicant is being vetted for while their survey runs in a private
 /// chat. A DM carries no chat→tenant mapping, so we cache user→tenant when the survey is offered and
-/// drop it on completion. State is in-memory (fine at this scale); on restart it can be rehydrated
-/// from in-progress sessions via an API call if desired.
+/// drop it on completion. State is in-memory (fine at this scale); rehydrated from in-progress
+/// applications on every bot startup (see TelegramUpdateWorker.RehydrateRouterAsync) — a restart no
+/// longer strands anyone mid-survey.
 /// </summary>
 public sealed class TenantRouter
 {
