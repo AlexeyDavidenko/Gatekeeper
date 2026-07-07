@@ -58,6 +58,9 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
     public async Task<IReadOnlyList<PendingCommand>> GetPendingTelegramCommandsAsync(int batch, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<PendingCommand>>($"/internal/telegram-commands/pending?batch={batch}", ct) ?? [];
 
+    public async Task<IReadOnlyList<InProgressApplicant>> GetInProgressApplicantsAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<InProgressApplicant>>("/internal/applications/in-progress", ct) ?? [];
+
     public async Task AckTelegramCommandAsync(long tenantId, long commandId, CommandResult result, CancellationToken ct = default)
     {
         using var res = await http.PostAsJsonAsync($"/internal/telegram-commands/{tenantId}/{commandId}/result", result, ct);

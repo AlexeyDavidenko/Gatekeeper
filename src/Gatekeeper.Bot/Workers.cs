@@ -19,11 +19,35 @@ public sealed class TelegramUpdateWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await RehydrateRouterAsync(stoppingToken);
+
         var options = new ReceiverOptions
         {
             AllowedUpdates = [UpdateType.ChatJoinRequest, UpdateType.Message, UpdateType.CallbackQuery],
         };
         await bot.ReceiveAsync(HandleUpdateAsync, HandleErrorAsync, options, stoppingToken);
+    }
+
+    /// <summary>
+    /// Repopulates the in-memory TenantRouter from applications still mid-survey. Without this, any
+    /// restart of this process — a deploy, a crash, or the whole box coming back after a power/internet
+    /// outage — silently strands anyone who was answering questions: their next DM would carry no
+    /// tenant mapping and get dropped instead of routed. Best-effort: a failure here logs and moves on
+    /// to polling rather than blocking startup, since it can be retried by the next restart.
+    /// </summary>
+    private async Task RehydrateRouterAsync(CancellationToken ct)
+    {
+        try
+        {
+            var applicants = await api.GetInProgressApplicantsAsync(ct);
+            foreach (var applicant in applicants)
+                router.Remember(applicant.TelegramUserId, applicant.TenantId);
+            log.LogInformation("Rehydrated TenantRouter with {Count} in-progress applicant(s).", applicants.Count);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Failed to rehydrate TenantRouter from in-progress applications.");
+        }
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient _, Update update, CancellationToken ct)

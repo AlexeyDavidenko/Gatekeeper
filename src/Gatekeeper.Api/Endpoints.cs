@@ -214,6 +214,26 @@ public static class InternalEndpoints
                 : Results.Ok(new { chat.TenantId, Role = chat.Role.ToString() });
         });
 
+        // Rehydration: the bot calls this once at startup to repopulate its in-memory TenantRouter —
+        // otherwise a restart (deploy, crash, power/internet outage) silently strands anyone
+        // mid-survey, since a DM carries no chat->tenant mapping on its own.
+        g.MapGet("/applications/in-progress", async (
+            CatalogDbContext catalog, TenantDbContextFactory factory, CancellationToken ct) =>
+        {
+            var result = new List<InProgressApplicant>();
+            var tenants = await catalog.Tenants.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
+            foreach (var tenant in tenants)
+            {
+                await using var db = factory.ForDatabase(tenant.DatabaseName);
+                var userIds = await db.Applications.AsNoTracking()
+                    .Where(a => a.Status == ApplicationStatus.SurveyOffered || a.Status == ApplicationStatus.InSurvey)
+                    .Select(a => a.TelegramUserId)
+                    .ToListAsync(ct);
+                result.AddRange(userIds.Select(userId => new InProgressApplicant(tenant.Id, userId)));
+            }
+            return Results.Ok(result);
+        });
+
         // Outbox drain: scan active tenants, claim Pending commands, hand them to the bot.
         g.MapGet("/telegram-commands/pending", async (
             int? batch, CatalogDbContext catalog, TenantDbContextFactory factory, CancellationToken ct) =>

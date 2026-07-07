@@ -55,6 +55,10 @@ public sealed record CommandButton(string Text, string CallbackData);
 
 public sealed record CommandResult(bool Success, string? Error, long? MessageId = null);
 
+/// <summary>An applicant whose survey is still in progress (SurveyOffered/InSurvey) — used to
+/// rehydrate the bot's in-memory TenantRouter after a restart.</summary>
+public sealed record InProgressApplicant(long TenantId, long TelegramUserId);
+
 /// <summary>The only surface Bot and Web use to reach data — they never touch the database.</summary>
 public interface IGatekeeperApiClient
 {
@@ -67,4 +71,5 @@ public interface IGatekeeperApiClient
     Task<(long TenantId, string Role)?> ResolveTenantByChatAsync(long chatId, CancellationToken ct = default);
     Task<IReadOnlyList<PendingCommand>> GetPendingTelegramCommandsAsync(int batch, CancellationToken ct = default);
     Task AckTelegramCommandAsync(long tenantId, long commandId, CommandResult result, CancellationToken ct = default);
+    Task<IReadOnlyList<InProgressApplicant>> GetInProgressApplicantsAsync(CancellationToken ct = default);
 }
