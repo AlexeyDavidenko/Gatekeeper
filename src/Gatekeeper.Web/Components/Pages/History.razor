@@ -16,17 +16,30 @@ else
 {
     <table class="grid">
         <thead>
-            <tr><th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th><th></th></tr>
+            <tr>
+                <th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th>
+                <AuthorizeView Context="ownerContext" Roles="Owner">
+                    <Authorized><th>Кем</th><th>Откуда</th></Authorized>
+                </AuthorizeView>
+                <th></th>
+            </tr>
         </thead>
         <tbody>
             @foreach (var a in _apps)
             {
+                var decision = _decisions.GetValueOrDefault(a.Id);
                 <tr>
                     <td>@a.Id</td>
                     <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
                     <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
                     <td>@(a.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</td>
                     <td><LocalTime Value="a.SubmittedAt" /></td>
+                    <AuthorizeView Context="ownerContext" Roles="Owner">
+                        <Authorized>
+                            <td>@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</td>
+                            <td>@(decision?.Source ?? "—")</td>
+                        </Authorized>
+                    </AuthorizeView>
                     <td><a href="applications/@a.Id">Открыть</a></td>
                 </tr>
             }
@@ -36,11 +49,21 @@ else
 
 @code {
     private IReadOnlyList<ApplicationSummary>? _apps;
+    private Dictionary<long, ModerationLogEntry> _decisions = [];
 
     protected override async Task OnInitializedAsync()
     {
         var approved = await Api.GetByStatusAsync("Approved");
         var rejected = await Api.GetByStatusAsync("Rejected");
         _apps = approved.Concat(rejected).OrderByDescending(a => a.SubmittedAt).ToList();
+
+        // "Кем"/"Откуда" — same audit-log data as /audit, just joined onto each application by id
+        // (only Owners see these two columns; the fetch itself is harmless either way since
+        // AuthorizeView suppresses rendering server-side for anyone else).
+        var log = await Api.GetAuditLogAsync();
+        _decisions = log
+            .Where(e => e.ApplicationId is not null && e.Action is "Approve" or "Reject")
+            .GroupBy(e => e.ApplicationId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).First());
     }
 }
