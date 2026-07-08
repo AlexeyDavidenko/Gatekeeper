@@ -85,8 +85,10 @@ public sealed class TelegramUpdateWorker(
                 if (first.QuestionId is not null)
                     await bot.SendMessage(jr.From.Id, WelcomeMessage, cancellationToken: ct);
 
+                // Prompt text is admin-authored HTML (Telegram-compatible subset, sanitized on save
+                // in Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
                 if (first.Prompt is not null)
-                    await bot.SendMessage(jr.From.Id, first.Prompt, cancellationToken: ct);
+                    await bot.SendMessage(jr.From.Id, first.Prompt, parseMode: ParseMode.Html, cancellationToken: ct);
                 break;
             }
 
@@ -99,7 +101,8 @@ public sealed class TelegramUpdateWorker(
                     router.Forget(from.Id);
                     await bot.SendMessage(from.Id, ThankYouMessage, cancellationToken: ct);
                 }
-                else if (next.Prompt is not null) await bot.SendMessage(from.Id, next.Prompt, cancellationToken: ct);
+                else if (next.Prompt is not null)
+                    await bot.SendMessage(from.Id, next.Prompt, parseMode: ParseMode.Html, cancellationToken: ct);
                 break;
             }
 

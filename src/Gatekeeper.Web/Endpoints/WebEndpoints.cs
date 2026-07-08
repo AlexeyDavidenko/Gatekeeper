@@ -86,14 +86,16 @@ public static class WebEndpoints
         {
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
-            await api.CreateQuestionAsync(form["promptText"]!, form["isRequired"] == "true", ct);
+            var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
+            await api.CreateQuestionAsync(promptText, form["isRequired"] == "true", ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/save", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
         {
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
-            await api.EditQuestionAsync(id, form["promptText"]!, form["isRequired"] == "true", ct);
+            var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
+            await api.EditQuestionAsync(id, promptText, form["isRequired"] == "true", ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)

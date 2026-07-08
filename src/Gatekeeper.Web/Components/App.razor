@@ -35,11 +35,18 @@
         .avatar-fallback { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: .8rem; }
         .avatar-lg { width: 72px; height: 72px; font-size: 1.5rem; }
         .bio { opacity: .8; font-style: italic; }
+        .rte { border: 1px solid #8886; border-radius: .375rem; overflow: hidden; }
+        .rte-toolbar { display: flex; gap: .25rem; padding: .3rem; border-bottom: 1px solid #8883; background: #8881; }
+        .rte-toolbar button { background: none; border: 1px solid transparent; border-radius: .25rem; padding: .25rem .5rem; cursor: pointer; font-size: .9rem; color: inherit; line-height: 1; }
+        .rte-toolbar button:hover { border-color: #8886; }
+        .rte-editor { padding: .45rem .5rem; min-height: 1.4rem; outline: none; }
+        .rte-editor a { color: #2563eb; }
     </style>
     <HeadOutlet />
 </head>
 <body>
     <Routes />
     <script src="js/localtime.js"></script>
+    <script src="js/richtext.js"></script>
 </body>
 </html>

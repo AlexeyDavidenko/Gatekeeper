@@ -25,7 +25,7 @@ else
         @foreach (var ans in _card.Answers)
         {
             <div class="answer">
-                <div class="q">@ans.Position. @ans.Prompt</div>
+                <div class="q">@ans.Position. @((MarkupString)ans.Prompt)</div>
                 <div class="a">@(string.IsNullOrWhiteSpace(ans.Text) ? "—" : ans.Text)</div>
             </div>
         }

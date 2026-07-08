@@ -23,7 +23,7 @@ else
             {
                 <tr>
                     <td>@q.Position</td>
-                    <td>@q.PromptText</td>
+                    <td>@((MarkupString)q.PromptText)</td>
                     <td>@(q.IsRequired ? "да" : "нет")</td>
                     <td>@(q.IsActive ? "да" : "нет")</td>
                     <td class="actions">
@@ -50,7 +50,7 @@ else
 <h2>Добавить вопрос</h2>
 <form method="post" action="questions/create">
     <AntiforgeryToken />
-    <input type="text" name="promptText" placeholder="Текст вопроса" required />
+    <RichTextEditor Name="promptText" />
     <label><input type="checkbox" name="isRequired" value="true" /> обязательный</label>
     <button type="submit" class="approve">Добавить</button>
 </form>

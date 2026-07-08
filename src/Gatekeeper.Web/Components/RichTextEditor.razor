@@ -1,0 +1,24 @@
+@* Minimal WYSIWYG editor restricted to the tags Telegram's ParseMode.Html actually renders —
+   bold/italic/underline/strikethrough/code/links. No block elements: question prompts are
+   single-line, so Enter is suppressed client-side (see richtext.js) rather than dealing with
+   <div>/<br> vs literal "\n" conversion for something this short. *@
+<div class="rte">
+    <div class="rte-toolbar">
+        <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
+        <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
+        <button type="button" data-cmd="underline" title="Подчёркнутый"><u>Ч</u></button>
+        <button type="button" data-cmd="strikeThrough" title="Зачёркнутый"><s>З</s></button>
+        <button type="button" data-cmd="code" title="Моноширинный текст">&lt;/&gt;</button>
+        <button type="button" data-cmd="link" title="Ссылка">🔗</button>
+    </div>
+    <div class="rte-editor" contenteditable="true" id="@_id" data-required="@(Required ? "true" : null)">@((MarkupString)(Value ?? ""))</div>
+    <input type="hidden" name="@Name" id="@(_id)-input" value="@Value" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public bool Required { get; set; } = true;
+
+    private readonly string _id = "rte-" + Guid.NewGuid().ToString("N");
+}

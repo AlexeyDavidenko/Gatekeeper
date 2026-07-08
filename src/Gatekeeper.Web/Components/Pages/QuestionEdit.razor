@@ -13,7 +13,7 @@ else
     <h1>Редактировать вопрос #@_question.Id</h1>
     <form method="post" action="/questions/@_question.Id/save">
         <AntiforgeryToken />
-        <input type="text" name="promptText" value="@_question.PromptText" required />
+        <RichTextEditor Name="promptText" Value="@_question.PromptText" />
         <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> обязательный</label>
         <button type="submit" class="approve">Сохранить</button>
     </form>

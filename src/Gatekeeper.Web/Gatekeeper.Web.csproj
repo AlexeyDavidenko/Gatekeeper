@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Telegram.Bot" />
+    <PackageReference Include="HtmlSanitizer" />
   </ItemGroup>
 
   <ItemGroup>
