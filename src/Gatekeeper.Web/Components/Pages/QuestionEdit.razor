@@ -15,6 +15,7 @@ else
         <AntiforgeryToken />
         <RichTextEditor Name="promptText" Value="@_question.PromptText" />
         <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> обязательный</label>
+        <QuestionTypeEditor Type="@_question.Type" Options="@_question.Options" />
         <button type="submit" class="approve">Сохранить</button>
     </form>
 }

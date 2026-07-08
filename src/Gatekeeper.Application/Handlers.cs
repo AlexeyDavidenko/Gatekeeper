@@ -56,10 +56,12 @@ public sealed class CreateApplicationHandler(
  
 // --- Submit a survey answer -----------------------------------------------------------------
  
-public sealed record SubmitAnswerCommand(long TelegramUserId, string? Text);
- 
-public sealed record NextStep(long? QuestionId, string? Prompt, string? Type, bool Completed, string? LanguageCode = null);
- 
+public sealed record SubmitAnswerCommand(long TelegramUserId, string? Text, IReadOnlyList<int>? SelectedOptionIndexes = null);
+
+public sealed record NextStep(
+    long? QuestionId, string? Prompt, string? Type, bool Completed,
+    string? LanguageCode = null, IReadOnlyList<string>? Options = null);
+
 public sealed class SubmitAnswerHandler(
     IApplicationRepository applications,
     IQuestionRepository questions,
@@ -73,10 +75,10 @@ public sealed class SubmitAnswerHandler(
     public async Task<NextStep> HandleAsync(SubmitAnswerCommand cmd, CancellationToken ct = default)
     {
         var now = clock.UtcNow;
- 
+
         var application = await applications.GetActiveForUserAsync(cmd.TelegramUserId, ct)
             ?? throw new InvalidOperationException("No active application for this user.");
- 
+
         // The applicant's first private message starts the survey.
         if (application.Status == ApplicationStatus.SurveyOffered)
         {
@@ -84,18 +86,41 @@ public sealed class SubmitAnswerHandler(
                 ?? throw new InvalidOperationException("No active questions configured.");
             application.StartSurvey(firstQ.Id, now);
         }
- 
+
         var currentId = application.Session!.CurrentQuestionId
             ?? throw new InvalidOperationException("Survey has no current question.");
         var current = await questions.GetByIdAsync(currentId, ct)
             ?? throw new InvalidOperationException("Current question not found.");
- 
-        var answer = Answer.Create(current.Id, current.PromptText, current.Type, current.Position,
-            cmd.Text, optionsJson: null, now);
-        var next = await questions.GetNextActiveAsync(current.Position, ct);
-        application.AddAnswer(answer, next?.Id, now);
 
         var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+
+        string? answerText;
+        string? optionsJson;
+        if (current.Type is QuestionType.SingleChoice or QuestionType.MultiChoice)
+        {
+            var options = ChoiceOptions.ParseQuestionOptions(current.ConfigJson) ?? [];
+            if (cmd.SelectedOptionIndexes is not { Count: > 0 })
+            {
+                // Stray free text (or an empty submit) while a button-only question is pending —
+                // re-prompt the same question instead of silently recording it as the answer.
+                return new NextStep(current.Id, current.PromptText, current.Type.ToString(), Completed: false,
+                    user?.LanguageCode, options);
+            }
+
+            var labels = cmd.SelectedOptionIndexes.Where(i => i >= 0 && i < options.Count).Select(i => options[i]).ToList();
+            answerText = string.Join(", ", labels);
+            optionsJson = ChoiceOptions.SerializeSelectedIndices(cmd.SelectedOptionIndexes);
+        }
+        else
+        {
+            answerText = cmd.Text;
+            optionsJson = null;
+        }
+
+        var answer = Answer.Create(current.Id, current.PromptText, current.Type, current.Position,
+            answerText, optionsJson, now);
+        var next = await questions.GetNextActiveAsync(current.Position, ct);
+        application.AddAnswer(answer, next?.Id, now);
 
         if (next is null)
         {
@@ -122,6 +147,7 @@ public sealed class SubmitAnswerHandler(
 
         return next is null
             ? new NextStep(null, null, null, Completed: true, user?.LanguageCode)
-            : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false, user?.LanguageCode);
+            : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false,
+                user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(next.ConfigJson));
     }
 }

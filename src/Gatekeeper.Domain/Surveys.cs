@@ -31,8 +31,9 @@ public sealed class Question : AggregateRoot
         UpdatedAt = now,
     };
 
-    public void Edit(string promptText, bool isRequired, string? configJson, DateTimeOffset now)
+    public void Edit(QuestionType type, string promptText, bool isRequired, string? configJson, DateTimeOffset now)
     {
+        Type = type;
         PromptText = promptText;
         IsRequired = isRequired;
         ConfigJson = configJson;
@@ -50,4 +51,26 @@ public sealed class Question : AggregateRoot
         IsActive = false;
         UpdatedAt = now;
     }
+}
+
+/// <summary>
+/// (De)serializes the two JSON shapes that live in Question.ConfigJson (the available option
+/// labels for SingleChoice/MultiChoice) and Answer.OptionsJson (the indices the applicant picked
+/// into that list) — kept next to Question since both are only meaningful in terms of it.
+/// </summary>
+public static class ChoiceOptions
+{
+    public static string? SerializeQuestionOptions(IReadOnlyList<string>? options) =>
+        options is not { Count: > 0 } ? null : System.Text.Json.JsonSerializer.Serialize(options);
+
+    public static IReadOnlyList<string>? ParseQuestionOptions(string? configJson) =>
+        string.IsNullOrEmpty(configJson) ? null : System.Text.Json.JsonSerializer.Deserialize<List<string>>(configJson);
+
+    public static string SerializeSelectedIndices(IReadOnlyList<int> indices) =>
+        System.Text.Json.JsonSerializer.Serialize(indices);
+
+    public static IReadOnlyList<int> ParseSelectedIndices(string? optionsJson) =>
+        string.IsNullOrEmpty(optionsJson)
+            ? []
+            : System.Text.Json.JsonSerializer.Deserialize<List<int>>(optionsJson) ?? [];
 }

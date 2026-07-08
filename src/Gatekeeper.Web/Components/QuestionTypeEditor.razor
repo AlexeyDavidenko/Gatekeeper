@@ -1,0 +1,33 @@
+@* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Options are
+   posted back as repeated "options" form fields (add/remove rows handled client-side by
+   wwwroot/js/questionoptions.js — this project has no interactive Blazor runtime, so all of this
+   is progressive enhancement on top of a plain form post). Captcha isn't offered — no rendering or
+   answer-parsing exists for it yet. *@
+<label>Тип ответа:
+    <select name="type" class="q-type-select">
+        <option value="Text" selected="@(Type == "Text")">Текст</option>
+        <option value="SingleChoice" selected="@(Type == "SingleChoice")">Один вариант (radio)</option>
+        <option value="MultiChoice" selected="@(Type == "MultiChoice")">Несколько вариантов (checkbox)</option>
+    </select>
+</label>
+<div class="q-options" hidden="@(Type is not ("SingleChoice" or "MultiChoice"))">
+    <p class="muted">Варианты ответа:</p>
+    <div class="q-options-list">
+        @if (Options is not null)
+        {
+            @foreach (var opt in Options)
+            {
+                <div class="q-option-row">
+                    <input type="text" name="options" value="@opt" />
+                    <button type="button" class="link q-remove-option">✕</button>
+                </div>
+            }
+        }
+    </div>
+    <button type="button" class="link q-add-option">+ добавить вариант</button>
+</div>
+
+@code {
+    [Parameter] public string Type { get; set; } = "Text";
+    [Parameter] public IReadOnlyList<string>? Options { get; set; }
+}

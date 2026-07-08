@@ -10,9 +10,11 @@ public sealed record TelegramUserDto(
 public sealed record CreateApplicationRequest(
     long ChatId, TelegramUserDto User, long? UserChatId, string? InviteLink, string? Bio);
 
-public sealed record SubmitAnswerRequest(long TelegramUserId, string? Text);
+public sealed record SubmitAnswerRequest(long TelegramUserId, string? Text, IReadOnlyList<int>? SelectedOptionIndexes = null);
 
-public sealed record NextQuestionDto(long? QuestionId, string? Prompt, string Type, bool Completed, string? LanguageCode = null);
+public sealed record NextQuestionDto(
+    long? QuestionId, string? Prompt, string Type, bool Completed,
+    string? LanguageCode = null, IReadOnlyList<string>? Options = null);
 
 public sealed record SetLanguageRequest(string LanguageCode);
 
@@ -39,11 +41,14 @@ public sealed record ApplicationCard(
 
 public sealed record AnswerDto(string Prompt, string Type, int Position, string? Text);
 
-// Question management. Only plain text prompts are exposed here — the survey engine has no
-// rendering/answer-parsing for the other QuestionType values yet (see docs/backlog.md).
-public sealed record QuestionDto(long Id, int Position, string PromptText, bool IsRequired, bool IsActive);
-public sealed record CreateQuestionRequest(string PromptText, bool IsRequired);
-public sealed record EditQuestionRequest(string PromptText, bool IsRequired);
+// Question management. Type is "Text"/"SingleChoice"/"MultiChoice" — Captcha exists on the domain
+// but has no rendering/answer-parsing behind it, so it's not exposed as a choosable type here.
+// Options carries the choice labels (null/empty for Text questions).
+public sealed record QuestionDto(
+    long Id, int Position, string PromptText, bool IsRequired, bool IsActive,
+    string Type, IReadOnlyList<string>? Options);
+public sealed record CreateQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options);
+public sealed record EditQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options);
 
 public sealed record ModerationLogEntry(
     long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,

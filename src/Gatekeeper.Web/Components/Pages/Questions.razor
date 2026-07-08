@@ -16,7 +16,7 @@ else
 {
     <table class="grid">
         <thead>
-            <tr><th>#</th><th>Текст</th><th>Обязательный</th><th>Активен</th><th></th></tr>
+            <tr><th>#</th><th>Текст</th><th>Тип</th><th>Обязательный</th><th>Активен</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var q in _questions)
@@ -24,6 +24,7 @@ else
                 <tr>
                     <td>@q.Position</td>
                     <td>@((MarkupString)q.PromptText)</td>
+                    <td>@TypeLabel(q)</td>
                     <td>@(q.IsRequired ? "да" : "нет")</td>
                     <td>@(q.IsActive ? "да" : "нет")</td>
                     <td class="actions">
@@ -52,6 +53,7 @@ else
     <AntiforgeryToken />
     <RichTextEditor Name="promptText" />
     <label><input type="checkbox" name="isRequired" value="true" /> обязательный</label>
+    <QuestionTypeEditor Type="Text" />
     <button type="submit" class="approve">Добавить</button>
 </form>
 
@@ -59,4 +61,11 @@ else
     private IReadOnlyList<QuestionDto>? _questions;
 
     protected override async Task OnInitializedAsync() => _questions = await Api.GetQuestionsAsync();
+
+    private static string TypeLabel(QuestionDto q) => q.Type switch
+    {
+        "SingleChoice" => $"Один вариант ({q.Options?.Count ?? 0})",
+        "MultiChoice" => $"Несколько вариантов ({q.Options?.Count ?? 0})",
+        _ => "Текст",
+    };
 }

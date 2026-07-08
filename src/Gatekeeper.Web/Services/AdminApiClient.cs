@@ -72,18 +72,21 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         return await res.Content.ReadFromJsonAsync<QuestionDto>(ct);
     }
 
-    public async Task CreateQuestionAsync(string promptText, bool isRequired, CancellationToken ct = default)
+    public async Task CreateQuestionAsync(
+        string type, string promptText, bool isRequired, IReadOnlyList<string>? options, CancellationToken ct = default)
     {
-        using var res = await http.SendAsync(Post("/questions", new CreateQuestionRequest(promptText, isRequired)), ct);
+        using var res = await http.SendAsync(
+            Post("/questions", new CreateQuestionRequest(type, promptText, isRequired, options)), ct);
         res.EnsureSuccessStatusCode();
     }
 
-    public async Task EditQuestionAsync(long id, string promptText, bool isRequired, CancellationToken ct = default)
+    public async Task EditQuestionAsync(
+        long id, string type, string promptText, bool isRequired, IReadOnlyList<string>? options, CancellationToken ct = default)
     {
         var msg = new HttpRequestMessage(HttpMethod.Put, $"/questions/{id}")
         {
             Headers = { { "X-Tenant-Id", TenantId.ToString() } },
-            Content = JsonContent.Create(new EditQuestionRequest(promptText, isRequired)),
+            Content = JsonContent.Create(new EditQuestionRequest(type, promptText, isRequired, options)),
         };
         using var res = await http.SendAsync(msg, ct);
         res.EnsureSuccessStatusCode();

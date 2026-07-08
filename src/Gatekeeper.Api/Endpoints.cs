@@ -96,9 +96,11 @@ public static class ApplicationsEndpoints
         // Submit a survey answer (active application resolved by user id) → next question or completion.
         group.MapPost("/answers", async (SubmitAnswerRequest body, SubmitAnswerHandler handler, CancellationToken ct) =>
         {
-            var step = await handler.HandleAsync(new SubmitAnswerCommand(body.TelegramUserId, body.Text), ct);
+            var step = await handler.HandleAsync(
+                new SubmitAnswerCommand(body.TelegramUserId, body.Text, body.SelectedOptionIndexes), ct);
             return Results.Ok(new NextQuestionDto(
-                step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed, step.LanguageCode));
+                step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed,
+                step.LanguageCode, step.Options));
         });
 
         // Admin-group button press. Data is "appr:{id}" / "rej:{id}" (decision) or
@@ -219,13 +221,21 @@ public static class QuestionsEndpoints
 
         group.MapPost("/", async (CreateQuestionRequest body, CreateQuestionHandler handler, CancellationToken ct) =>
         {
-            var id = await handler.HandleAsync(new CreateQuestionCommand(body.PromptText, body.IsRequired), ct);
+            if (!Enum.TryParse<QuestionType>(body.Type, out var type))
+                return Results.BadRequest("Invalid question type.");
+
+            var configJson = ChoiceOptions.SerializeQuestionOptions(body.Options);
+            var id = await handler.HandleAsync(new CreateQuestionCommand(type, body.PromptText, body.IsRequired, configJson), ct);
             return Results.Ok(new { Id = id });
         });
 
         group.MapPut("/{id:long}", async (long id, EditQuestionRequest body, EditQuestionHandler handler, CancellationToken ct) =>
         {
-            await handler.HandleAsync(new EditQuestionCommand(id, body.PromptText, body.IsRequired), ct);
+            if (!Enum.TryParse<QuestionType>(body.Type, out var type))
+                return Results.BadRequest("Invalid question type.");
+
+            var configJson = ChoiceOptions.SerializeQuestionOptions(body.Options);
+            await handler.HandleAsync(new EditQuestionCommand(id, type, body.PromptText, body.IsRequired, configJson), ct);
             return Results.NoContent();
         });
 
@@ -250,7 +260,9 @@ public static class QuestionsEndpoints
         return app;
     }
 
-    private static QuestionDto ToDto(Question q) => new(q.Id, q.Position, q.PromptText, q.IsRequired, q.IsActive);
+    private static QuestionDto ToDto(Question q) => new(
+        q.Id, q.Position, q.PromptText, q.IsRequired, q.IsActive,
+        q.Type.ToString(), ChoiceOptions.ParseQuestionOptions(q.ConfigJson));
 }
 
 public static class ModerationEndpoints

@@ -87,7 +87,8 @@ public static class WebEndpoints
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
             var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
-            await api.CreateQuestionAsync(promptText, form["isRequired"] == "true", ct);
+            var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
+            await api.CreateQuestionAsync(type, promptText, form["isRequired"] == "true", ParseOptions(form, type), ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/save", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
@@ -95,7 +96,8 @@ public static class WebEndpoints
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
             var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
-            await api.EditQuestionAsync(id, promptText, form["isRequired"] == "true", ct);
+            var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
+            await api.EditQuestionAsync(id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type), ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
@@ -132,6 +134,13 @@ public static class WebEndpoints
         var (userId, name) = CurrentUser(ctx);
         var outcome = await api.DecideAsync(id, rowVersion, approve, form["reason"], userId, name, ct);
         return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/queue?notice=conflict" : "/queue");
+    }
+
+    private static IReadOnlyList<string>? ParseOptions(IFormCollection form, string type)
+    {
+        if (type is not ("SingleChoice" or "MultiChoice")) return null;
+        var values = form["options"].Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()).ToList();
+        return values.Count > 0 ? values : null;
     }
 
     private static async Task ValidateAsync(IAntiforgery antiforgery, HttpContext ctx)

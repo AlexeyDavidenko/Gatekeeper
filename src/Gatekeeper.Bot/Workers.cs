@@ -47,6 +47,28 @@ public sealed class TelegramUpdateWorker(
         ],
     ]);
 
+    // One option per row, tapping immediately submits — "sc:{questionId}:{optionIndex}".
+    private static InlineKeyboardMarkup SingleChoiceKeyboard(long questionId, IReadOnlyList<string> options) => new(
+        options.Select((opt, i) => new[] { InlineKeyboardButton.WithCallbackData(opt, $"sc:{questionId}:{i}") }));
+
+    // Each row toggles its own bit in an int bitmask carried in its own callback data (no bot- or
+    // server-side state needed between taps — the same trick already used for the admin card's
+    // show/hide-answers toggle, just extended to N options instead of one). A final row submits.
+    private static InlineKeyboardMarkup MultiChoiceKeyboard(long questionId, IReadOnlyList<string> options, int mask)
+    {
+        var rows = new List<IEnumerable<InlineKeyboardButton>>();
+        for (var i = 0; i < options.Count; i++)
+        {
+            var isChecked = (mask & (1 << i)) != 0;
+            var label = (isChecked ? "☑ " : "☐ ") + options[i];
+            rows.Add([InlineKeyboardButton.WithCallbackData(label, $"mc:{questionId}:{mask}:{i}")]);
+        }
+        rows.Add([InlineKeyboardButton.WithCallbackData("✅ Готово / Done", $"mcdone:{questionId}:{mask}")]);
+        return new InlineKeyboardMarkup(rows);
+    }
+
+    private static string StripCheckbox(string label) => label.Length > 2 ? label[2..] : label;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await RehydrateRouterAsync(stoppingToken);
@@ -128,13 +150,7 @@ public sealed class TelegramUpdateWorker(
             {
                 if (router.Resolve(from.Id) is not { } tenantId) break;  // no active survey for this user
                 var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(from.Id, msg.Text), ct);
-                if (next.Completed)
-                {
-                    router.Forget(from.Id);
-                    await bot.SendMessage(from.Id, ThankYouMessage(IsRussian(next.LanguageCode)), cancellationToken: ct);
-                }
-                else if (next.Prompt is not null)
-                    await bot.SendMessage(from.Id, next.Prompt, parseMode: ParseMode.Html, cancellationToken: ct);
+                await AdvanceAsync(from.Id, next, ct);
                 break;
             }
 
@@ -165,6 +181,55 @@ public sealed class TelegramUpdateWorker(
                 break;
             }
 
+            // SingleChoice: one tap submits immediately — "sc:{questionId}:{optionIndex}".
+            case { CallbackQuery: { Data: { } data } cb } when data.StartsWith("sc:"):
+            {
+                if (router.Resolve(cb.From.Id) is { } tenantId)
+                {
+                    var parts = data.Split(':');
+                    var index = int.Parse(parts[2]);
+                    var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(cb.From.Id, null, [index]), ct);
+                    await AdvanceAsync(cb.From.Id, next, ct);
+                }
+                await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
+                break;
+            }
+
+            // MultiChoice toggle — "mc:{questionId}:{mask}:{optionIndex}". The current option labels
+            // are read back from the message's own keyboard (stripping the ☐/☑ prefix), so no extra
+            // API round-trip or bot-/server-side state is needed to rebuild it with the new mask.
+            case { CallbackQuery: { Message: { ReplyMarkup.InlineKeyboard: { } kb } m, Data: { } data } cb } when data.StartsWith("mc:"):
+            {
+                var parts = data.Split(':');
+                var questionId = long.Parse(parts[1]);
+                var mask = int.Parse(parts[2]);
+                var toggled = int.Parse(parts[3]);
+                var newMask = mask ^ (1 << toggled);
+
+                var options = kb.Take(kb.Count() - 1)   // last row is the Done button, not an option
+                    .Select(row => StripCheckbox(row.First().Text)).ToList();
+                await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId,
+                    MultiChoiceKeyboard(questionId, options, newMask), cancellationToken: ct);
+                await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
+                break;
+            }
+
+            // MultiChoice submit — "mcdone:{questionId}:{mask}". Only indices travel to the API; the
+            // server already has the question loaded and resolves them back to labels itself.
+            case { CallbackQuery: { Data: { } data } cb } when data.StartsWith("mcdone:"):
+            {
+                if (router.Resolve(cb.From.Id) is { } tenantId)
+                {
+                    var parts = data.Split(':');
+                    var mask = int.Parse(parts[2]);
+                    var indices = Enumerable.Range(0, 31).Where(i => (mask & (1 << i)) != 0).ToList();
+                    var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(cb.From.Id, null, indices), ct);
+                    await AdvanceAsync(cb.From.Id, next, ct);
+                }
+                await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
+                break;
+            }
+
             case { CallbackQuery: { Message: { } m } cb }:
                 var tenant = await api.ResolveTenantByChatAsync(m.Chat.Id, ct);
                 if (tenant is null) break;
@@ -176,13 +241,40 @@ public sealed class TelegramUpdateWorker(
         }
     }
 
-    // Prompt text is admin-authored HTML (Telegram-compatible subset, sanitized on save in
-    // Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
     private async Task SendFirstQuestionAsync(long tenantId, long userId, CancellationToken ct)
     {
         var q = await api.GetFirstActiveQuestionAsync(tenantId, ct);
         if (q is not null)
-            await bot.SendMessage(userId, q.PromptText, parseMode: ParseMode.Html, cancellationToken: ct);
+            await SendQuestionAsync(userId, q.Id, q.PromptText, q.Type, q.Options, ct);
+    }
+
+    /// <summary>Completion or next-question dispatch — shared by the free-text and button-tap paths.</summary>
+    private async Task AdvanceAsync(long userId, NextQuestionDto next, CancellationToken ct)
+    {
+        if (next.Completed)
+        {
+            router.Forget(userId);
+            await bot.SendMessage(userId, ThankYouMessage(IsRussian(next.LanguageCode)), cancellationToken: ct);
+        }
+        else if (next.Prompt is not null)
+        {
+            await SendQuestionAsync(userId, next.QuestionId!.Value, next.Prompt, next.Type, next.Options, ct);
+        }
+    }
+
+    // Prompt text is admin-authored HTML (Telegram-compatible subset, sanitized on save in
+    // Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
+    // SingleChoice/MultiChoice questions get an inline keyboard instead of a "type your answer" prompt.
+    private async Task SendQuestionAsync(
+        long userId, long questionId, string promptText, string type, IReadOnlyList<string>? options, CancellationToken ct)
+    {
+        InlineKeyboardMarkup? keyboard = (type, options) switch
+        {
+            ("SingleChoice", { Count: > 0 } opts) => SingleChoiceKeyboard(questionId, opts),
+            ("MultiChoice", { Count: > 0 } opts) => MultiChoiceKeyboard(questionId, opts, mask: 0),
+            _ => null,
+        };
+        await bot.SendMessage(userId, promptText, parseMode: ParseMode.Html, replyMarkup: keyboard, cancellationToken: ct);
     }
 
     private Task HandleErrorAsync(ITelegramBotClient _, Exception ex, CancellationToken ct)
