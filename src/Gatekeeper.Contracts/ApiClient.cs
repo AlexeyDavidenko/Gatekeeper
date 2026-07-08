@@ -12,7 +12,9 @@ public sealed record CreateApplicationRequest(
 
 public sealed record SubmitAnswerRequest(long TelegramUserId, string? Text);
 
-public sealed record NextQuestionDto(long? QuestionId, string? Prompt, string Type, bool Completed);
+public sealed record NextQuestionDto(long? QuestionId, string? Prompt, string Type, bool Completed, string? LanguageCode = null);
+
+public sealed record SetLanguageRequest(string LanguageCode);
 
 public sealed record DecideRequest(
     bool Approve, string? Reason, long ActingUserId, string? ActingUserName, string Source);
@@ -90,4 +92,11 @@ public interface IGatekeeperApiClient
     Task<IReadOnlyList<PendingCommand>> GetPendingTelegramCommandsAsync(int batch, CancellationToken ct = default);
     Task AckTelegramCommandAsync(long tenantId, long commandId, CommandResult result, CancellationToken ct = default);
     Task<IReadOnlyList<InProgressApplicant>> GetInProgressApplicantsAsync(CancellationToken ct = default);
+
+    // Bot-side language picker: the first active question (fetched again once the user resolves
+    // the language prompt, since it's not sent immediately at join request anymore) and persisting
+    // an explicit language choice so later messages — including ones sent by a different process,
+    // like a decision made from the website — pick it up.
+    Task<QuestionDto?> GetFirstActiveQuestionAsync(long tenantId, CancellationToken ct = default);
+    Task SetUserLanguageAsync(long tenantId, long telegramUserId, string languageCode, CancellationToken ct = default);
 }

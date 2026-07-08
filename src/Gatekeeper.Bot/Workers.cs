@@ -17,8 +17,35 @@ public sealed class TelegramUpdateWorker(
     TenantRouter router,
     ILogger<TelegramUpdateWorker> log) : BackgroundService
 {
-    private const string WelcomeMessage = "👋 Добро пожаловать! Пожалуйста, ответьте на несколько вопросов, чтобы подать заявку.";
-    private const string ThankYouMessage = "🙏 Спасибо за ответы! Ваша заявка принята и будет рассмотрена в ближайшее время.";
+    // Only these two are supported — Telegram's own language_code covers dozens, anything not
+    // Russian falls back to English. Applies only to the bot's own generated text (greeting,
+    // thank-you, decision DM) — question prompts stay whatever the admin typed, unlocalized.
+    private static bool IsRussian(string? languageCode) =>
+        languageCode?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string WelcomeMessage(bool ru) => ru
+        ? "👋 Добро пожаловать! Пожалуйста, ответьте на несколько вопросов, чтобы подать заявку.\n\nХотите сменить язык переписки?"
+        : "👋 Welcome! Please answer a few quick questions to complete your application.\n\nWould you like to switch the language?";
+
+    private static string ThankYouMessage(bool ru) => ru
+        ? "🙏 Спасибо за ответы! Ваша заявка принята и будет рассмотрена в ближайшее время."
+        : "🙏 Thank you for your answers! Your application has been received and will be reviewed shortly.";
+
+    private static InlineKeyboardMarkup LanguageOfferKeyboard(bool ru) => new(
+    [
+        [
+            InlineKeyboardButton.WithCallbackData(ru ? "🌐 Сменить язык" : "🌐 Change language", "lang:switch"),
+            InlineKeyboardButton.WithCallbackData(ru ? "▶️ Продолжить" : "▶️ Continue", "lang:go"),
+        ],
+    ]);
+
+    private static readonly InlineKeyboardMarkup LanguagePickerKeyboard = new(
+    [
+        [
+            InlineKeyboardButton.WithCallbackData("🇷🇺 Русский", "lang:ru"),
+            InlineKeyboardButton.WithCallbackData("🇬🇧 English", "lang:en"),
+        ],
+    ]);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -80,15 +107,20 @@ public sealed class TelegramUpdateWorker(
                         jr.From.Username, jr.From.FirstName, jr.From.LastName, jr.From.LanguageCode, photoFileId),
                     jr.UserChatId, jr.InviteLink?.InviteLink, jr.Bio), ct);
 
-                // The no-questions-configured fallback prompt already reads as a welcome on its own —
-                // only prepend a distinct greeting when there's a real first question to lead into.
                 if (first.QuestionId is not null)
-                    await bot.SendMessage(jr.From.Id, WelcomeMessage, cancellationToken: ct);
-
-                // Prompt text is admin-authored HTML (Telegram-compatible subset, sanitized on save
-                // in Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
-                if (first.Prompt is not null)
-                    await bot.SendMessage(jr.From.Id, first.Prompt, parseMode: ParseMode.Html, cancellationToken: ct);
+                {
+                    // Greet + offer a language switch; the first question is sent only once the user
+                    // resolves this (via the "lang:*" callback below), not from here — so it can be
+                    // sent in whichever language they end up choosing.
+                    var ru = IsRussian(jr.From.LanguageCode);
+                    await bot.SendMessage(jr.From.Id, WelcomeMessage(ru), replyMarkup: LanguageOfferKeyboard(ru), cancellationToken: ct);
+                }
+                else if (first.Prompt is not null)
+                {
+                    // No-questions-configured edge case already reads as a welcome on its own —
+                    // nothing to gate behind a language choice, just deliver the fallback text as-is.
+                    await bot.SendMessage(jr.From.Id, first.Prompt, cancellationToken: ct);
+                }
                 break;
             }
 
@@ -99,10 +131,37 @@ public sealed class TelegramUpdateWorker(
                 if (next.Completed)
                 {
                     router.Forget(from.Id);
-                    await bot.SendMessage(from.Id, ThankYouMessage, cancellationToken: ct);
+                    await bot.SendMessage(from.Id, ThankYouMessage(IsRussian(next.LanguageCode)), cancellationToken: ct);
                 }
                 else if (next.Prompt is not null)
                     await bot.SendMessage(from.Id, next.Prompt, parseMode: ParseMode.Html, cancellationToken: ct);
+                break;
+            }
+
+            // The applicant's own language-picker buttons — resolved via the same in-memory
+            // TenantRouter used for DM routing (this is a private chat with the bot, not the admin
+            // group, so /internal/tenants/resolve by chat id doesn't apply here).
+            case { CallbackQuery: { Message: { } m, Data: { } data } cb } when data.StartsWith("lang:"):
+            {
+                if (router.Resolve(cb.From.Id) is { } tenantId)
+                {
+                    var action = data["lang:".Length..];
+                    switch (action)
+                    {
+                        case "switch":
+                            await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId, LanguagePickerKeyboard, cancellationToken: ct);
+                            break;
+                        case "go":
+                            await SendFirstQuestionAsync(tenantId, cb.From.Id, ct);
+                            break;
+                        case "ru":
+                        case "en":
+                            await api.SetUserLanguageAsync(tenantId, cb.From.Id, action, ct);
+                            await SendFirstQuestionAsync(tenantId, cb.From.Id, ct);
+                            break;
+                    }
+                }
+                await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
                 break;
             }
 
@@ -115,6 +174,15 @@ public sealed class TelegramUpdateWorker(
                 await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
                 break;
         }
+    }
+
+    // Prompt text is admin-authored HTML (Telegram-compatible subset, sanitized on save in
+    // Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
+    private async Task SendFirstQuestionAsync(long tenantId, long userId, CancellationToken ct)
+    {
+        var q = await api.GetFirstActiveQuestionAsync(tenantId, ct);
+        if (q is not null)
+            await bot.SendMessage(userId, q.PromptText, parseMode: ParseMode.Html, cancellationToken: ct);
     }
 
     private Task HandleErrorAsync(ITelegramBotClient _, Exception ex, CancellationToken ct)

@@ -50,6 +50,7 @@ builder.Services.AddScoped<CreateQuestionHandler>();
 builder.Services.AddScoped<EditQuestionHandler>();
 builder.Services.AddScoped<MoveQuestionHandler>();
 builder.Services.AddScoped<DeactivateQuestionHandler>();
+builder.Services.AddScoped<SetUserLanguageHandler>();
 
 var app = builder.Build();
 

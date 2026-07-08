@@ -67,6 +67,25 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
         res.EnsureSuccessStatusCode();
     }
 
+    public async Task<QuestionDto?> GetFirstActiveQuestionAsync(long tenantId, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Get, "/questions/first-active")
+        {
+            Headers = { { "X-Tenant-Id", tenantId.ToString() } },
+        };
+        using var res = await http.SendAsync(msg, ct);
+        if (res.StatusCode == HttpStatusCode.NotFound) return null;
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<QuestionDto>(ct);
+    }
+
+    public async Task SetUserLanguageAsync(long tenantId, long telegramUserId, string languageCode, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(
+            Build(HttpMethod.Post, $"/users/{telegramUserId}/language", tenantId, new SetLanguageRequest(languageCode)), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     private static HttpRequestMessage Build<T>(HttpMethod method, string path, long tenantId, T body) =>
         new(method, path)
         {

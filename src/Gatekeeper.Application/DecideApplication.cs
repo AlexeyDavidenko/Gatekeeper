@@ -43,6 +43,7 @@ public sealed class DecideApplicationHandler(
             throw new ConcurrencyConflictException("Application was modified by someone else.");
 
         var now = clock.UtcNow;
+        var user = await users.GetByTelegramIdAsync(application.TelegramUserId, ct);
 
         if (cmd.Approve) application.Approve(now);
         else application.Reject(now);
@@ -60,11 +61,13 @@ public sealed class DecideApplicationHandler(
             JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.MainChatId, UserId: application.TelegramUserId)),
             application.Id, application.TelegramUserId, now));
 
+        var isRu = Lang.IsRussian(user?.LanguageCode);
+        var verdictDm = cmd.Approve
+            ? (isRu ? "✅ Ваша заявка одобрена, добро пожаловать!" : "✅ Your application has been approved, welcome!")
+            : (isRu ? "❌ Ваша заявка отклонена." : "❌ Your application was declined.");
         queue.Enqueue(TelegramCommand.Enqueue(
             TelegramCommandType.SendMessage,
-            JsonSerializer.Serialize(new TelegramCommandPayload(
-                ChatId: application.TelegramUserId,
-                Text: cmd.Approve ? "✅ Ваша заявка одобрена, добро пожаловать!" : "❌ Ваша заявка отклонена.")),
+            JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.TelegramUserId, Text: verdictDm)),
             application.Id, application.TelegramUserId, now));
 
         // 3) Reflect the decision on the moderation card, if the outbox drain already reported its
@@ -74,7 +77,6 @@ public sealed class DecideApplicationHandler(
             var adminChatId = await directory.GetAdminChatIdAsync(tenant.TenantId, ct);
             if (adminChatId is { } chatId)
             {
-                var user = await users.GetByTelegramIdAsync(application.TelegramUserId, ct);
                 var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName, user?.Bio);
                 var by = cmd.ActingUserName ?? cmd.ActingUserId.ToString();
                 var text = header + AdminCardText.BuildVerdict(cmd.Approve, by);

@@ -97,7 +97,8 @@ public static class ApplicationsEndpoints
         group.MapPost("/answers", async (SubmitAnswerRequest body, SubmitAnswerHandler handler, CancellationToken ct) =>
         {
             var step = await handler.HandleAsync(new SubmitAnswerCommand(body.TelegramUserId, body.Text), ct);
-            return Results.Ok(new NextQuestionDto(step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed));
+            return Results.Ok(new NextQuestionDto(
+                step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed, step.LanguageCode));
         });
 
         // Admin-group button press. Data is "appr:{id}" / "rej:{id}" (decision) or
@@ -207,6 +208,15 @@ public static class QuestionsEndpoints
             return q is null ? Results.NotFound() : Results.Ok(ToDto(q));
         });
 
+        // Bot's language picker re-fetches this once the user resolves the language prompt — the
+        // bot no longer sends the first question immediately at join request, it waits for that.
+        group.MapGet("/first-active", async (TenantDbContext db, CancellationToken ct) =>
+        {
+            var q = await db.Questions.AsNoTracking()
+                .Where(x => x.IsActive).OrderBy(x => x.Position).FirstOrDefaultAsync(ct);
+            return q is null ? Results.NotFound() : Results.Ok(ToDto(q));
+        });
+
         group.MapPost("/", async (CreateQuestionRequest body, CreateQuestionHandler handler, CancellationToken ct) =>
         {
             var id = await handler.HandleAsync(new CreateQuestionCommand(body.PromptText, body.IsRequired), ct);
@@ -247,6 +257,16 @@ public static class ModerationEndpoints
 {
     public static IEndpointRouteBuilder MapModerationEndpoints(this IEndpointRouteBuilder app)
     {
+        // Bot's language picker persists the applicant's explicit choice here — so a decision DM
+        // sent much later (possibly by a website approve/reject, a different process entirely)
+        // still picks the right language.
+        app.MapPost("/users/{telegramUserId:long}/language", async (
+            long telegramUserId, SetLanguageRequest body, SetUserLanguageHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new SetUserLanguageCommand(telegramUserId, body.LanguageCode), ct);
+            return Results.NoContent();
+        });
+
         app.MapPost("/users/{telegramUserId:long}/moderation", async (
             long telegramUserId, ModerationRequest body, ModerateUserHandler handler, CancellationToken ct) =>
         {

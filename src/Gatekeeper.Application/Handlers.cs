@@ -58,7 +58,7 @@ public sealed class CreateApplicationHandler(
  
 public sealed record SubmitAnswerCommand(long TelegramUserId, string? Text);
  
-public sealed record NextStep(long? QuestionId, string? Prompt, string? Type, bool Completed);
+public sealed record NextStep(long? QuestionId, string? Prompt, string? Type, bool Completed, string? LanguageCode = null);
  
 public sealed class SubmitAnswerHandler(
     IApplicationRepository applications,
@@ -94,14 +94,15 @@ public sealed class SubmitAnswerHandler(
             cmd.Text, optionsJson: null, now);
         var next = await questions.GetNextActiveAsync(current.Position, ct);
         application.AddAnswer(answer, next?.Id, now);
- 
+
+        var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+
         if (next is null)
         {
             // Completed → notify the admin group via the outbox (durable, single executor).
             var adminChatId = await directory.GetAdminChatIdAsync(tenant.TenantId, ct)
                 ?? throw new InvalidOperationException("Admin chat is not configured for this tenant.");
- 
-            var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+
             var header = AdminCardText.BuildHeader(application.Id, user?.Username, user?.FirstName, user?.LastName, user?.Bio);
 
             var payload = new TelegramCommandPayload(
@@ -116,11 +117,11 @@ public sealed class SubmitAnswerHandler(
             queue.Enqueue(TelegramCommand.Enqueue(TelegramCommandType.SendAdminCard,
                 JsonSerializer.Serialize(payload), application.Id, cmd.TelegramUserId, now));
         }
- 
+
         await unitOfWork.SaveChangesAsync(ct);
- 
+
         return next is null
-            ? new NextStep(null, null, null, Completed: true)
-            : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false);
+            ? new NextStep(null, null, null, Completed: true, user?.LanguageCode)
+            : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false, user?.LanguageCode);
     }
 }

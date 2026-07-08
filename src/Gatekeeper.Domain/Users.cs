@@ -74,6 +74,10 @@ public sealed class TelegramUser : AggregateRoot
     }
 
     public void SetPhoneNumber(string phoneNumber) => PhoneNumber = phoneNumber;
+
+    /// <summary>Explicit language override from the bot's language-picker, normalized to "ru"/"en" — takes
+    /// priority over the raw Telegram-reported <see cref="LanguageCode"/> from first contact.</summary>
+    public void SetLanguagePreference(string languageCode) => LanguageCode = languageCode;
 }
 
 /// <summary>An immutable photograph of how a user presented at a point in time.</summary>
