@@ -310,6 +310,37 @@ public static class ModerationEndpoints
     }
 }
 
+public static class SiteVisitsEndpoints
+{
+    public static IEndpointRouteBuilder MapSiteVisitsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/site-visits");
+
+        // Written by Web's background flush worker — never on the request-serving path itself,
+        // so a slow/failed write here never adds latency to (or breaks) an actual page load.
+        group.MapPost("/", async (RecordSiteVisitRequest body, RecordSiteVisitHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new RecordSiteVisitCommand(
+                body.UserId, body.UserName, body.SessionId, body.IpAddress, body.Path, body.Method,
+                body.StatusCode, body.DurationMs, body.UserAgent, body.Referrer), ct);
+            return Results.NoContent();
+        });
+
+        // Visitor log for the admin site — gated client-side to the elevated (Owner) role, same as
+        // the moderation audit log used to be (see docs/changelog.md — replaced 2026-07-08).
+        group.MapGet("/", async (ISiteVisitRepository visits, CancellationToken ct) =>
+        {
+            var recent = await visits.GetRecentAsync(200, ct);
+            var result = recent.Select(v => new SiteVisitDto(
+                v.Id, v.UserId, v.UserName, v.SessionId, v.IpAddress, v.Path, v.Method,
+                v.StatusCode, v.DurationMs, v.UserAgent, v.Referrer, v.CreatedAt)).ToList();
+            return Results.Ok(result);
+        });
+
+        return app;
+    }
+}
+
 public static class DashboardEndpoints
 {
     public static IEndpointRouteBuilder MapDashboardEndpoints(this IEndpointRouteBuilder app)

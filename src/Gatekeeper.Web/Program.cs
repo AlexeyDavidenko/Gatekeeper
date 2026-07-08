@@ -1,3 +1,4 @@
+using Gatekeeper.Web;
 using Gatekeeper.Web.Auth;
 using Gatekeeper.Web.Components;
 using Gatekeeper.Web.Endpoints;
@@ -36,6 +37,11 @@ builder.Services.AddHttpClient<AdminApiClient>(http =>
     http.DefaultRequestHeaders.Add("X-Internal-Key", builder.Configuration["Internal:ApiKey"]!);
 });
 
+// Visitor log: request pipeline hands off to a bounded in-memory queue, drained by a background
+// worker — see SiteVisitLogging.cs for why this must never sit on the request-serving path.
+builder.Services.AddSingleton<SiteVisitQueue>();
+builder.Services.AddHostedService<SiteVisitFlushWorker>();
+
 var app = builder.Build();
 
 // Without this, an unhandled exception anywhere in the pipeline (e.g. a routing conflict, a bad
@@ -46,6 +52,7 @@ app.UseExceptionHandler("/Error", createScopeForErrors: true);
 app.UseStaticFiles();          // wwwroot/* (localtime.js, app.css) — was missing entirely, so these 404'd
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SiteVisitMiddleware>();   // after auth (needs ctx.User); static files never reach it
 app.UseAntiforgery();
 
 app.MapWebEndpoints();            // /auth/* and /applications/* form posts

@@ -80,6 +80,12 @@ public interface IModerationRepository
     Task<ModerationAction?> GetLatestDecisionAsync(long applicationId, CancellationToken ct = default);
 }
 
+public interface ISiteVisitRepository
+{
+    Task AddAsync(SiteVisit visit, CancellationToken ct = default);
+    Task<IReadOnlyList<SiteVisit>> GetRecentAsync(int take, CancellationToken ct = default);
+}
+
 /// <summary>Adds an outbox command to the current unit of work; committed atomically with the change.</summary>
 public interface ITelegramCommandQueue
 {

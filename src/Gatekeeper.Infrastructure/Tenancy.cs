@@ -85,6 +85,15 @@ public sealed class TelegramCommandQueue(TenantDbContext db) : ITelegramCommandQ
     public void Enqueue(TelegramCommand command) => db.TelegramCommands.Add(command);
 }
 
+public sealed class SiteVisitRepository(TenantDbContext db) : ISiteVisitRepository
+{
+    public async Task AddAsync(SiteVisit visit, CancellationToken ct = default) =>
+        await db.SiteVisits.AddAsync(visit, ct);
+
+    public async Task<IReadOnlyList<SiteVisit>> GetRecentAsync(int take, CancellationToken ct = default) =>
+        await db.SiteVisits.AsNoTracking().OrderByDescending(v => v.CreatedAt).Take(take).ToListAsync(ct);
+}
+
 public sealed class UserRepository(TenantDbContext db) : IUserRepository
 {
     public Task<TelegramUser?> GetByTelegramIdAsync(long telegramUserId, CancellationToken ct = default) =>

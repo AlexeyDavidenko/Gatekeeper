@@ -44,6 +44,19 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         return await res.Content.ReadFromJsonAsync<List<ModerationLogEntry>>(ct) ?? [];
     }
 
+    public async Task RecordVisitAsync(RecordSiteVisitRequest request, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post("/site-visits", request), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<SiteVisitDto>> GetSiteVisitsAsync(CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get("/site-visits"), ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<SiteVisitDto>>(ct) ?? [];
+    }
+
     public async Task<IReadOnlyList<QuestionDto>> GetQuestionsAsync(CancellationToken ct = default)
     {
         using var res = await http.SendAsync(Get("/questions"), ct);

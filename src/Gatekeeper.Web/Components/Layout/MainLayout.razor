@@ -11,7 +11,7 @@
                 <a class="nav" href="/questions">Вопросы</a>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>
-                        <a class="nav" href="/audit">Аудит-лог</a>
+                        <a class="nav" href="/visitors">Посетители</a>
                     </Authorized>
                 </AuthorizeView>
                 <span class="user">@context.User.Identity?.Name</span>

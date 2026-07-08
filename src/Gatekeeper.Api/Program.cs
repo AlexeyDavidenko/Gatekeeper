@@ -35,6 +35,7 @@ builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
 builder.Services.AddScoped<IModerationRepository, ModerationRepository>();
+builder.Services.AddScoped<ISiteVisitRepository, SiteVisitRepository>();
 builder.Services.AddScoped<ITelegramCommandQueue, TelegramCommandQueue>();
 builder.Services.AddScoped<ITenantDirectory, TenantDirectory>();
 builder.Services.AddScoped<TenantDbContextFactory>();        // cross-tenant outbox drain
@@ -51,6 +52,7 @@ builder.Services.AddScoped<EditQuestionHandler>();
 builder.Services.AddScoped<MoveQuestionHandler>();
 builder.Services.AddScoped<DeactivateQuestionHandler>();
 builder.Services.AddScoped<SetUserLanguageHandler>();
+builder.Services.AddScoped<RecordSiteVisitHandler>();
 
 var app = builder.Build();
 
@@ -70,5 +72,6 @@ app.MapModerationEndpoints();
 app.MapInternalEndpoints();                       // tenant resolve + outbox drain (tenant-agnostic)
 app.MapQuestionsEndpoints();
 app.MapDashboardEndpoints();
+app.MapSiteVisitsEndpoints();
 
 app.Run();

@@ -50,6 +50,15 @@ public sealed record ModerationLogEntry(
     string Action, string? Reason, string? Notes, long PerformedByUserId, string? PerformedByName,
     string Source, DateTimeOffset CreatedAt);
 
+// Site visitor log — page views against the admin site itself, not moderation actions.
+public sealed record RecordSiteVisitRequest(
+    long? UserId, string? UserName, string SessionId, string? IpAddress, string Path, string Method,
+    int StatusCode, long DurationMs, string? UserAgent, string? Referrer);
+
+public sealed record SiteVisitDto(
+    long Id, long? UserId, string? UserName, string SessionId, string? IpAddress, string Path, string Method,
+    int StatusCode, long DurationMs, string? UserAgent, string? Referrer, DateTimeOffset CreatedAt);
+
 public sealed record DashboardSummary(
     int PendingCount,
     int ApprovedToday, int RejectedToday,

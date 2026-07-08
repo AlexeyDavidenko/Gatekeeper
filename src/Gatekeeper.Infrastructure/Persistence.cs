@@ -21,6 +21,7 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
     public DbSet<ModerationAction> ModerationActions => Set<ModerationAction>();
     public DbSet<ModerationAttachment> ModerationAttachments => Set<ModerationAttachment>();
     public DbSet<TelegramCommand> TelegramCommands => Set<TelegramCommand>();
+    public DbSet<SiteVisit> SiteVisits => Set<SiteVisit>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -60,6 +61,12 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
             e.HasIndex(c => c.Status);
             e.Property(c => c.RowVersion).HasColumnName("xmin").HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+        });
+
+        b.Entity<SiteVisit>(e =>
+        {
+            e.HasIndex(v => v.CreatedAt);
+            e.HasIndex(v => v.SessionId);
         });
 
         base.OnModelCreating(b);
