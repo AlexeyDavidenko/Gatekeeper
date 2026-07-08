@@ -165,6 +165,40 @@ public static class ApplicationsEndpoints
             return Results.Ok(result);
         });
 
+        // Fuzzy-ish lookup for the bot's admin "/find" command — matches username/first/last name
+        // regardless of status (unlike the queue above, which defaults to AwaitingReview only).
+        group.MapGet("/search", async (string? q, TenantDbContext db, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(q)) return Results.Ok(new List<ApplicationSummary>());
+
+            var pattern = $"%{q.Trim()}%";
+            var matchingUserIds = await db.Users.AsNoTracking()
+                .Where(u => EF.Functions.ILike(u.Username ?? "", pattern) ||
+                            EF.Functions.ILike(u.FirstName ?? "", pattern) ||
+                            EF.Functions.ILike(u.LastName ?? "", pattern))
+                .Select(u => u.TelegramUserId)
+                .ToListAsync(ct);
+
+            var apps = await db.Applications.AsNoTracking()
+                .Where(a => matchingUserIds.Contains(a.TelegramUserId))
+                .OrderByDescending(a => a.SubmittedAt ?? a.CreatedAt)
+                .Take(10)
+                .ToListAsync(ct);
+
+            var users = await db.Users.AsNoTracking()
+                .Where(u => matchingUserIds.Contains(u.TelegramUserId))
+                .ToDictionaryAsync(u => u.TelegramUserId, ct);
+
+            var result = apps.Select(a =>
+            {
+                users.TryGetValue(a.TelegramUserId, out var u);
+                return new ApplicationSummary(a.Id, a.TelegramUserId, u?.Username, Display(u),
+                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId);
+            }).ToList();
+
+            return Results.Ok(result);
+        });
+
         // Full card with answers + the row version the site echoes back as If-Match.
         group.MapGet("/{id:long}", async (long id, TenantDbContext db, CancellationToken ct) =>
         {
@@ -447,6 +481,30 @@ public static class InternalEndpoints
                 result.AddRange(userIds.Select(userId => new InProgressApplicant(tenant.Id, userId)));
             }
             return Results.Ok(result);
+        });
+
+        // The bot's "/status" DM command: a user's own application can live in any tenant's DB and
+        // the bot has no persistent chat->tenant mapping outside an active survey (TenantRouter is
+        // forgotten once the survey completes), so this scans active tenants the same way the two
+        // endpoints above do, keeping only the single most recent application found across all of them.
+        g.MapGet("/applications/by-user/{telegramUserId:long}", async (
+            long telegramUserId, CatalogDbContext catalog, TenantDbContextFactory factory, CancellationToken ct) =>
+        {
+            Domain.Application? best = null;
+            var tenants = await catalog.Tenants.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
+            foreach (var tenant in tenants)
+            {
+                await using var db = factory.ForDatabase(tenant.DatabaseName);
+                var candidate = await db.Applications.AsNoTracking()
+                    .Where(a => a.TelegramUserId == telegramUserId)
+                    .OrderByDescending(a => a.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
+                if (candidate is not null && (best is null || candidate.CreatedAt > best.CreatedAt))
+                    best = candidate;
+            }
+            return best is null
+                ? Results.NotFound()
+                : Results.Ok(new LatestApplicationStatusDto(best.Status.ToString(), best.SubmittedAt));
         });
 
         // Outbox drain: scan active tenants, claim Pending commands, hand them to the bot.

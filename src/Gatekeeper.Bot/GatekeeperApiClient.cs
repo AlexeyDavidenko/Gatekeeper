@@ -86,6 +86,46 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
         res.EnsureSuccessStatusCode();
     }
 
+    public async Task<DashboardSummary> GetDashboardAsync(long tenantId, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Get, "/dashboard") { Headers = { { "X-Tenant-Id", tenantId.ToString() } } };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+        return (await res.Content.ReadFromJsonAsync<DashboardSummary>(ct))!;
+    }
+
+    public async Task<IReadOnlyList<ApplicationSummary>> GetApplicationsByStatusAsync(
+        long tenantId, string status, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Get, $"/applications?status={status}")
+        {
+            Headers = { { "X-Tenant-Id", tenantId.ToString() } },
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<ApplicationSummary>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<ApplicationSummary>> SearchApplicationsAsync(
+        long tenantId, string query, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Get, $"/applications/search?q={Uri.EscapeDataString(query)}")
+        {
+            Headers = { { "X-Tenant-Id", tenantId.ToString() } },
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<ApplicationSummary>>(ct) ?? [];
+    }
+
+    public async Task<LatestApplicationStatusDto?> GetLatestApplicationStatusAsync(long telegramUserId, CancellationToken ct = default)
+    {
+        using var res = await http.GetAsync($"/internal/applications/by-user/{telegramUserId}", ct);
+        if (res.StatusCode == HttpStatusCode.NotFound) return null;
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<LatestApplicationStatusDto>(ct);
+    }
+
     private static HttpRequestMessage Build<T>(HttpMethod method, string path, long tenantId, T body) =>
         new(method, path)
         {

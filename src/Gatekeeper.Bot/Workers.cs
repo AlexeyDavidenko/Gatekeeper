@@ -146,11 +146,68 @@ public sealed class TelegramUpdateWorker(
                 break;
             }
 
+            // Applicant commands — checked ahead of the free-text-as-answer case below so typing
+            // "/start"/"/status" mid-survey never gets misread as an answer to the current question.
+            case { Message: { Chat.Type: ChatType.Private, From: { } from, Text: { } text } msg } when CommandOf(text) == "/start":
+            {
+                var ru = IsRussian(from.LanguageCode);
+                var reply = router.Resolve(from.Id) is not null
+                    ? (ru ? "У вас уже есть заявка в процессе — просто ответьте на вопрос выше." : "You already have an application in progress — just answer the question above.")
+                    : (ru
+                        ? "👋 Привет! Чтобы подать заявку, отправьте запрос на вступление в группу — я пришлю анкету сюда, в личные сообщения."
+                        : "👋 Hi! To apply, send a join request to the group — I'll DM you a short questionnaire here.");
+                await bot.SendMessage(from.Id, reply, cancellationToken: ct);
+                break;
+            }
+
+            case { Message: { Chat.Type: ChatType.Private, From: { } from } msg } when CommandOf(msg.Text ?? "") == "/status":
+            {
+                var status = await api.GetLatestApplicationStatusAsync(from.Id, ct);
+                await bot.SendMessage(from.Id, FormatStatus(status, IsRussian(from.LanguageCode)), cancellationToken: ct);
+                break;
+            }
+
             case { Message: { Chat.Type: ChatType.Private, From: { } from } msg }:
             {
                 if (router.Resolve(from.Id) is not { } tenantId) break;  // no active survey for this user
                 var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(from.Id, msg.Text), ct);
                 await AdvanceAsync(from.Id, next, ct);
+                break;
+            }
+
+            // Admin-group commands. Only the admin group (Role == "AdminGroup") gets a reply — the
+            // same bot can also sit in the main group, which resolves to a tenant too but must not
+            // leak queue/stats data if someone types these there.
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/stats":
+            {
+                if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
+                {
+                    var summary = await api.GetDashboardAsync(tenantId, ct);
+                    await bot.SendMessage(msg.Chat.Id, FormatStats(summary), cancellationToken: ct);
+                }
+                break;
+            }
+
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/pending":
+            {
+                if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
+                {
+                    var pending = await api.GetApplicationsByStatusAsync(tenantId, "AwaitingReview", ct);
+                    await bot.SendMessage(msg.Chat.Id, FormatApplicationList(pending, "Нет заявок на рассмотрении."), cancellationToken: ct);
+                }
+                break;
+            }
+
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/find":
+            {
+                if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
+                {
+                    var query = ArgumentOf(text);
+                    var reply = string.IsNullOrWhiteSpace(query)
+                        ? "Использование: /find <имя или username>"
+                        : FormatApplicationList(await api.SearchApplicationsAsync(tenantId, query, ct), "Ничего не найдено.");
+                    await bot.SendMessage(msg.Chat.Id, reply, cancellationToken: ct);
+                }
                 break;
             }
 
@@ -275,6 +332,56 @@ public sealed class TelegramUpdateWorker(
             _ => null,
         };
         await bot.SendMessage(userId, promptText, parseMode: ParseMode.Html, replyMarkup: keyboard, cancellationToken: ct);
+    }
+
+    // "/stats", "/find foo" — strips the leading slash-token and an optional "@BotUsername" suffix
+    // (group chats with multiple bots disambiguate commands that way) from the first whitespace-
+    // separated token; ignores anything else on the line.
+    private static string CommandOf(string text) => text.Split([' ', '\n'], 2)[0].Split('@')[0];
+
+    private static string ArgumentOf(string text)
+    {
+        var spaceIndex = text.IndexOf(' ');
+        return spaceIndex < 0 ? "" : text[(spaceIndex + 1)..].Trim();
+    }
+
+    /// <summary>Resolves a chat to a tenant only if it's that tenant's admin group — commands like
+    /// "/stats"/"/pending"/"/find" must never answer from the main (applicant-facing) group.</summary>
+    private async Task<long?> ResolveAdminGroupAsync(long chatId, CancellationToken ct)
+    {
+        var tenant = await api.ResolveTenantByChatAsync(chatId, ct);
+        return tenant is { Role: "AdminGroup" } ? tenant.Value.TenantId : null;
+    }
+
+    private static string FormatStatus(LatestApplicationStatusDto? status, bool ru)
+    {
+        if (status is null) return ru ? "У вас пока нет заявок." : "You don't have any applications yet.";
+        return status.Status switch
+        {
+            "Approved" => ru ? "✅ Ваша заявка одобрена." : "✅ Your application was approved.",
+            "Rejected" => ru ? "❌ Ваша заявка отклонена." : "❌ Your application was declined.",
+            "AwaitingReview" => ru ? "⏳ Ваша заявка на рассмотрении." : "⏳ Your application is awaiting review.",
+            _ => ru ? "📝 Вы ещё проходите анкету." : "📝 You're still completing the questionnaire.",
+        };
+    }
+
+    private static string FormatStats(DashboardSummary s) =>
+        $"📊 Статистика\n" +
+        $"Ожидают: {s.PendingCount}\n" +
+        $"Сегодня: ✅ {s.ApprovedToday} / ❌ {s.RejectedToday}\n" +
+        $"За неделю: ✅ {s.ApprovedWeek} / ❌ {s.RejectedWeek}\n" +
+        $"Outbox: в очереди {s.OutboxPending}, в работе {s.OutboxInFlight}, ошибок {s.OutboxFailed}";
+
+    private static string FormatApplicationList(IReadOnlyList<ApplicationSummary> apps, string emptyText)
+    {
+        if (apps.Count == 0) return emptyText;
+        var lines = apps.Select(a =>
+        {
+            var name = a.DisplayName ?? "—";
+            var username = a.Username is null ? "" : $" (@{a.Username})";
+            return $"#{a.Id} {name}{username} — {a.Status}";
+        });
+        return string.Join("\n", lines);
     }
 
     private Task HandleErrorAsync(ITelegramBotClient _, Exception ex, CancellationToken ct)

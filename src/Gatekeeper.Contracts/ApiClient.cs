@@ -71,6 +71,10 @@ public sealed record DashboardSummary(
     int OutboxPending, int OutboxInFlight, int OutboxFailed,
     IReadOnlyList<ModerationLogEntry> RecentDecisions);
 
+// The bot's own "/status" DM command — a cross-tenant lookup (see the endpoint doc comment), so
+// unlike everything else here it carries no tenant id: the caller doesn't need one to show it.
+public sealed record LatestApplicationStatusDto(string Status, DateTimeOffset? SubmittedAt);
+
 // --- Tenant provisioning (control-plane, tenant-agnostic) ---
 
 public sealed record ProvisionTenantRequest(
@@ -113,4 +117,10 @@ public interface IGatekeeperApiClient
     // like a decision made from the website — pick it up.
     Task<QuestionDto?> GetFirstActiveQuestionAsync(long tenantId, CancellationToken ct = default);
     Task SetUserLanguageAsync(long tenantId, long telegramUserId, string languageCode, CancellationToken ct = default);
+
+    // Admin-group bot commands ("/stats", "/pending", "/find") and the applicant's own "/status".
+    Task<DashboardSummary> GetDashboardAsync(long tenantId, CancellationToken ct = default);
+    Task<IReadOnlyList<ApplicationSummary>> GetApplicationsByStatusAsync(long tenantId, string status, CancellationToken ct = default);
+    Task<IReadOnlyList<ApplicationSummary>> SearchApplicationsAsync(long tenantId, string query, CancellationToken ct = default);
+    Task<LatestApplicationStatusDto?> GetLatestApplicationStatusAsync(long telegramUserId, CancellationToken ct = default);
 }
