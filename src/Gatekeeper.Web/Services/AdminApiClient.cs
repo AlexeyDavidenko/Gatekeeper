@@ -11,9 +11,12 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
 {
     private long TenantId => long.Parse(config["Tenant:Id"]!);
 
-    public async Task<IReadOnlyList<ApplicationSummary>> GetPendingAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ApplicationSummary>> GetPendingAsync(CancellationToken ct = default) =>
+        await GetByStatusAsync("AwaitingReview", ct);
+
+    public async Task<IReadOnlyList<ApplicationSummary>> GetByStatusAsync(string status, CancellationToken ct = default)
     {
-        using var res = await http.SendAsync(Get("/applications?status=AwaitingReview"), ct);
+        using var res = await http.SendAsync(Get($"/applications?status={status}"), ct);
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<List<ApplicationSummary>>(ct) ?? [];
     }

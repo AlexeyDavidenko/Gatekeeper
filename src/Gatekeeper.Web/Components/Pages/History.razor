@@ -1,0 +1,46 @@
+@page "/history"
+@attribute [Authorize]
+@inject AdminApiClient Api
+
+<h1>История решений</h1>
+
+@if (_apps is null)
+{
+    <p>Загрузка…</p>
+}
+else if (_apps.Count == 0)
+{
+    <p class="muted">Пока нет решённых заявок.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var a in _apps)
+            {
+                <tr>
+                    <td>@a.Id</td>
+                    <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
+                    <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
+                    <td>@(a.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</td>
+                    <td><LocalTime Value="a.SubmittedAt" /></td>
+                    <td><a href="applications/@a.Id">Открыть</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<ApplicationSummary>? _apps;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var approved = await Api.GetByStatusAsync("Approved");
+        var rejected = await Api.GetByStatusAsync("Rejected");
+        _apps = approved.Concat(rejected).OrderByDescending(a => a.SubmittedAt).ToList();
+    }
+}
