@@ -200,8 +200,25 @@ public sealed class OutboxDrainWorker(
         }
     }
 
-    private static InlineKeyboardMarkup? Keyboard(IReadOnlyList<CommandButton>? buttons) =>
-        buttons is { Count: > 0 }
-            ? new InlineKeyboardMarkup(buttons.Select(b => InlineKeyboardButton.WithCallbackData(b.Text, b.CallbackData)))
-            : null;
+    // The show/hide-answers toggle gets its own row above approve/reject, instead of all three
+    // buttons crammed into a single row.
+    private static InlineKeyboardMarkup? Keyboard(IReadOnlyList<CommandButton>? buttons)
+    {
+        if (buttons is not { Count: > 0 }) return null;
+
+        var toggleRow = buttons.Where(IsAnswersToggle).Select(ToButton).ToList();
+        var decisionRow = buttons.Where(b => !IsAnswersToggle(b)).Select(ToButton).ToList();
+
+        var rows = new List<IEnumerable<InlineKeyboardButton>>();
+        if (toggleRow.Count > 0) rows.Add(toggleRow);
+        if (decisionRow.Count > 0) rows.Add(decisionRow);
+
+        return new InlineKeyboardMarkup(rows);
+    }
+
+    private static bool IsAnswersToggle(CommandButton b) =>
+        b.CallbackData.StartsWith("ans:") || b.CallbackData.StartsWith("hideans:");
+
+    private static InlineKeyboardButton ToButton(CommandButton b) =>
+        InlineKeyboardButton.WithCallbackData(b.Text, b.CallbackData);
 }
