@@ -34,13 +34,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task<TenantDbContext> CreateTenantDbAsync(CancellationToken ct = default)
     {
         var databaseName = $"tenant_test_{Guid.NewGuid():N}";
-
-        await using (var admin = new NpgsqlConnection(_container.GetConnectionString()))
-        {
-            await admin.OpenAsync(ct);
-            await using var create = new NpgsqlCommand($"CREATE DATABASE \"{databaseName}\"", admin);
-            await create.ExecuteNonQueryAsync(ct);
-        }
+        await CreateDatabaseAsync(databaseName, ct);
 
         var db = CreateContextFor(databaseName);
         await db.Database.MigrateAsync(ct);
@@ -48,13 +42,37 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     /// <summary>A second, independent DbContext against the same already-migrated database — used
-    /// to simulate two concurrent requests each loading their own in-memory copy of the same row.</summary>
+    /// to simulate two concurrent requests each loading their own in-memory copy of the same row,
+    /// or to reach a specific tenant database registered in a <see cref="CreateCatalogDbAsync"/> catalog.</summary>
     public TenantDbContext CreateContextFor(string databaseName)
     {
         var csb = new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = databaseName };
         return new TenantDbContext(new DbContextOptionsBuilder<TenantDbContext>()
             .UseNpgsql(csb.ConnectionString)
             .Options);
+    }
+
+    /// <summary>A fresh, migrated Catalog database — for the cross-tenant /internal/* endpoints,
+    /// which scan catalog.Tenants to find every active tenant database to fan out to.</summary>
+    public async Task<CatalogDbContext> CreateCatalogDbAsync(CancellationToken ct = default)
+    {
+        var databaseName = $"catalog_test_{Guid.NewGuid():N}";
+        await CreateDatabaseAsync(databaseName, ct);
+
+        var csb = new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = databaseName };
+        var db = new CatalogDbContext(new DbContextOptionsBuilder<CatalogDbContext>()
+            .UseNpgsql(csb.ConnectionString)
+            .Options);
+        await db.Database.MigrateAsync(ct);
+        return db;
+    }
+
+    private async Task CreateDatabaseAsync(string databaseName, CancellationToken ct)
+    {
+        await using var admin = new NpgsqlConnection(_container.GetConnectionString());
+        await admin.OpenAsync(ct);
+        await using var create = new NpgsqlCommand($"CREATE DATABASE \"{databaseName}\"", admin);
+        await create.ExecuteNonQueryAsync(ct);
     }
 }
 
