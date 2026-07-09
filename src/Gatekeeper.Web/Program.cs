@@ -55,6 +55,7 @@ app.UseAuthorization();
 app.UseMiddleware<SiteVisitMiddleware>();   // after auth (needs ctx.User); static files never reach it
 app.UseAntiforgery();
 
+app.MapDefaultEndpoints();        // /health, /alive (Aspire) — Development-only, see ServiceDefaults
 app.MapWebEndpoints();            // /auth/* and /applications/* form posts
 app.MapRazorComponents<App>();
 

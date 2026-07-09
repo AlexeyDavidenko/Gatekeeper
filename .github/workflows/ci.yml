@@ -144,6 +144,67 @@ jobs:
           echo "$response" | grep -q '"wasCreated":false' \
             || (echo "Expected wasCreated:false on re-provision" && exit 1)
 
+      # Boots the real Web app against the already-running API (same service-discovery env var
+      # shape docker-compose.yaml uses in prod: services__api__http__0), pointed at the "ci-demo"
+      # tenant seeded above (Id 1 — first row in a fresh Catalog DB). This is the check that would
+      # have caught the AddServiceDefaults() regression (commit 220b739): without it, service
+      # discovery breaks, http://api resolves to the wrong port, and every page after login rendered
+      # a blank white screen. Telegram__* values are fake — nothing here logs in for real, only
+      # /login (which needs just Telegram:BotUsername, no network call) and static/redirect
+      # behavior are exercised.
+      - name: Start Web
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:5300
+          services__api__http__0: http://localhost:5299
+          Api__BaseUrl: http://localhost:5299
+          Internal__ApiKey: ci-test-key
+          Telegram__BotToken: "0:CI-FAKE-TOKEN"
+          Telegram__BotUsername: ci_fake_bot
+          Telegram__AdminChatId: "-1001"
+          Tenant__Id: "1"
+        run: |
+          nohup dotnet src/Gatekeeper.Web/bin/Release/net10.0/Gatekeeper.Web.dll > web.log 2>&1 &
+          echo $! > web.pid
+
+      - name: Wait for Web health check
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:5300/health; then
+              echo "Web is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Web did not become healthy in time"
+          exit 1
+
+      - name: Verify /login renders anonymously
+        run: |
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:5300/login | grep -q '^200$' \
+            || (echo "Expected 200 from /login" && exit 1)
+
+      # Regression guard for the exact bug class fixed in commit 55c6d48: missing UseStaticFiles()
+      # left the whole wwwroot (including this file) silently 404ing.
+      - name: Verify static assets are served
+        run: |
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:5300/app.css | grep -q '^200$' \
+            || (echo "Expected 200 from /app.css — static files middleware may be missing" && exit 1)
+
+      - name: Verify unauthenticated requests redirect to /login
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5300/)
+          echo "Got $code"
+          [ "$code" = "302" ] || (echo "Expected 302 redirect to /login for an anonymous request to /" && exit 1)
+
+      - name: Show Web log
+        if: always()
+        run: cat web.log || true
+
+      - name: Stop Web
+        if: always()
+        run: kill "$(cat web.pid)" 2>/dev/null || true
+
       - name: Show API log
         if: always()
         run: cat api.log || true
