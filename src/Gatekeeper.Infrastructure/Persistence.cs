@@ -72,7 +72,23 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
         base.OnModelCreating(b);
     }
 
-    Task<int> IUnitOfWork.SaveChangesAsync(CancellationToken ct) => base.SaveChangesAsync(ct);
+    // A pre-check comparing an expected RowVersion (e.g. DecideApplicationHandler's If-Match) only
+    // catches a race where both sides re-read after the first commit — it does nothing for a
+    // second write already holding an in-memory copy loaded BEFORE that commit (the admin-group
+    // decision path, which has no expected version to check, is exactly this). That gap can only
+    // be caught here, at the actual commit — translate EF's raw exception into the one every
+    // caller already handles instead of leaking Postgres/EF concurrency detail across the boundary.
+    async Task<int> IUnitOfWork.SaveChangesAsync(CancellationToken ct)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException("The record was modified by someone else.", ex);
+        }
+    }
 }
 
 /// <summary>Shared control-plane database: the tenant registry used for routing.</summary>

@@ -93,4 +93,4 @@ public interface ITelegramCommandQueue
 }
 
 /// <summary>Raised when an optimistic-concurrency check fails (another decision won the race).</summary>
-public sealed class ConcurrencyConflictException(string message) : Exception(message);
+public sealed class ConcurrencyConflictException(string message, Exception? inner = null) : Exception(message, inner);

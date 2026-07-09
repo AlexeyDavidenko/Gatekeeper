@@ -13,11 +13,13 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gatekeeper.Domain\Gatekeeper.Domain.csproj" />
     <ProjectReference Include="..\..\src\Gatekeeper.Application\Gatekeeper.Application.csproj" />
+    <ProjectReference Include="..\..\src\Gatekeeper.Infrastructure\Gatekeeper.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Gatekeeper.Web\Gatekeeper.Web.csproj" />
   </ItemGroup>
 
