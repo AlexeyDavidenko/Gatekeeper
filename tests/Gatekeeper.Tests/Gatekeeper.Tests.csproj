@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gatekeeper.Domain\Gatekeeper.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Gatekeeper.Application\Gatekeeper.Application.csproj" />
     <ProjectReference Include="..\..\src\Gatekeeper.Web\Gatekeeper.Web.csproj" />
   </ItemGroup>
 

@@ -1,4 +1,5 @@
 using Gatekeeper.Domain;
+using DomainApplication = Gatekeeper.Domain.Application;
 using Xunit;
 
 namespace Gatekeeper.Tests;
@@ -18,7 +19,7 @@ public class ApplicationFsmTests
     [Fact]
     public void FromJoinRequest_Creates_Application_In_JoinRequested_Status()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         Assert.Equal(ApplicationStatus.JoinRequested, application.Status);
@@ -32,7 +33,7 @@ public class ApplicationFsmTests
     [Fact]
     public void MarkSurveyOffered_Transitions_From_JoinRequested_To_SurveyOffered()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         application.MarkSurveyOffered();
@@ -43,7 +44,7 @@ public class ApplicationFsmTests
     [Fact]
     public void MarkSurveyOffered_Throws_When_Called_From_SurveyOffered()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
 
@@ -54,7 +55,7 @@ public class ApplicationFsmTests
     [Fact]
     public void StartSurvey_Requires_SurveyOffered_Status()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         var ex = Assert.Throws<DomainException>(() => application.StartSurvey(1L, TestNow));
@@ -65,7 +66,7 @@ public class ApplicationFsmTests
     public void StartSurvey_Succeeds_From_SurveyOffered()
     {
         const long firstQuestionId = 42L;
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
 
@@ -80,7 +81,7 @@ public class ApplicationFsmTests
     [Fact]
     public void AddAnswer_With_NextQuestionId_Stays_InSurvey_And_Advances()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -97,7 +98,7 @@ public class ApplicationFsmTests
     [Fact]
     public void AddAnswer_With_Null_NextQuestionId_Transitions_To_AwaitingReview()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -115,7 +116,7 @@ public class ApplicationFsmTests
     [Fact]
     public void AddAnswer_Throws_When_Not_InSurvey()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         var answer = Answer.Create(1L, "Question 1?", QuestionType.Text, 1, "Answer text", null, TestNow);
@@ -126,7 +127,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Approve_Requires_AwaitingReview_Status()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         var ex = Assert.Throws<DomainException>(() => application.Approve(TestNow));
@@ -137,7 +138,7 @@ public class ApplicationFsmTests
     public void Approve_Succeeds_From_AwaitingReview()
     {
         var approvalTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -154,7 +155,7 @@ public class ApplicationFsmTests
     public void Approve_Throws_When_Already_Approved()
     {
         var approvalTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -169,7 +170,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Reject_Requires_AwaitingReview_Status()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         var ex = Assert.Throws<DomainException>(() => application.Reject(TestNow));
@@ -180,7 +181,7 @@ public class ApplicationFsmTests
     public void Reject_Succeeds_From_AwaitingReview()
     {
         var rejectionTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -197,7 +198,7 @@ public class ApplicationFsmTests
     public void Reject_Throws_When_Already_Rejected()
     {
         var rejectionTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -212,7 +213,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Cancel_Succeeds_From_JoinRequested()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         application.Cancel();
@@ -223,7 +224,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Cancel_Succeeds_From_SurveyOffered()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
 
@@ -235,7 +236,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Cancel_Succeeds_From_InSurvey()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -248,7 +249,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Cancel_Succeeds_From_AwaitingReview()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -264,7 +265,7 @@ public class ApplicationFsmTests
     public void Cancel_Throws_From_Approved()
     {
         var approvalTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -280,7 +281,7 @@ public class ApplicationFsmTests
     public void Cancel_Throws_From_Rejected()
     {
         var rejectionTime = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
@@ -295,7 +296,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Abandon_Requires_SurveyOffered_Or_InSurvey()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
 
         var ex = Assert.Throws<DomainException>(() => application.Abandon(TestNow));
@@ -305,7 +306,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Abandon_Succeeds_From_SurveyOffered()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
 
@@ -317,7 +318,7 @@ public class ApplicationFsmTests
     [Fact]
     public void Abandon_Succeeds_From_InSurvey()
     {
-        var application = Application.FromJoinRequest(
+        var application = DomainApplication.FromJoinRequest(
             TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         application.StartSurvey(1L, TestNow);
