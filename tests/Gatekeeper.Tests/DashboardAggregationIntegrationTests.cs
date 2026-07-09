@@ -201,7 +201,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         var inflightCmd = TelegramCommand.Enqueue(
             TelegramCommandType.SendMessage, payloadJson,
             applicationId: 502, telegramUserId: 1003, TestNow);
-        inflightCmd.MarkInFlight();
+        inflightCmd.MarkInFlight(TestNow);
 
         var failedCmd = TelegramCommand.Enqueue(
             TelegramCommandType.SendMessage, payloadJson,

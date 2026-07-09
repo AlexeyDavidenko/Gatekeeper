@@ -15,6 +15,7 @@ public sealed class TelegramCommand : AggregateRoot
     public long? ApplicationId { get; private set; }
     public long? TelegramUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? InFlightAt { get; private set; }    // when the current attempt was claimed
     public DateTimeOffset? CompletedAt { get; private set; }
     public uint RowVersion { get; private set; }   // xmin — prevents two drainers grabbing the same command
 
@@ -31,9 +32,10 @@ public sealed class TelegramCommand : AggregateRoot
         CreatedAt = now,
     };
 
-    public void MarkInFlight()
+    public void MarkInFlight(DateTimeOffset now)
     {
         Status = TelegramCommandStatus.InFlight;
+        InFlightAt = now;
         Attempts++;
     }
 
@@ -51,6 +53,25 @@ public sealed class TelegramCommand : AggregateRoot
         Status = TelegramCommandStatus.Failed;
         LastError = error;
         CompletedAt = now;
+    }
+
+    /// <summary>True once a claimed command has sat InFlight longer than staleAfter without an ack —
+    /// the bot that claimed it almost certainly crashed/restarted mid-send, not that Telegram is slow.</summary>
+    public bool IsStale(DateTimeOffset now, TimeSpan staleAfter) =>
+        Status == TelegramCommandStatus.InFlight && InFlightAt is { } claimedAt && now - claimedAt > staleAfter;
+
+    /// <summary>Recovers a stale InFlight command: retried (back to Pending) while attempts remain,
+    /// otherwise given up as Failed so a permanently-broken command doesn't retry forever.</summary>
+    public void ReclaimStale(DateTimeOffset now, int maxAttempts)
+    {
+        if (Attempts >= maxAttempts)
+        {
+            MarkFailed("Exceeded max retry attempts after getting stuck in-flight.", now);
+            return;
+        }
+
+        Status = TelegramCommandStatus.Pending;
+        InFlightAt = null;
     }
 }
 

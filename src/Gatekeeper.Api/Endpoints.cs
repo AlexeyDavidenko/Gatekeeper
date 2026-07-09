@@ -448,6 +448,12 @@ public static class DashboardEndpoints
 
 public static class InternalEndpoints
 {
+    // OutboxDrainWorker polls every 2s (Bot/Workers.cs) — a real Telegram call finishing in minutes
+    // would be extraordinary, so anything still InFlight this long almost certainly means the bot
+    // that claimed it crashed/restarted before acking, not that the call is merely slow.
+    private static readonly TimeSpan StaleInFlightThreshold = TimeSpan.FromMinutes(2);
+    private const int MaxOutboxAttempts = 5;
+
     // Tenant-agnostic control-plane surface (the tenant middleware skips /internal).
     public static IEndpointRouteBuilder MapInternalEndpoints(this IEndpointRouteBuilder app)
     {
@@ -507,18 +513,33 @@ public static class InternalEndpoints
                 : Results.Ok(new LatestApplicationStatusDto(best.Status.ToString(), best.SubmittedAt));
         });
 
-        // Outbox drain: scan active tenants, claim Pending commands, hand them to the bot.
+        // Outbox drain: scan active tenants, claim Pending commands, hand them to the bot. Before
+        // claiming anything new, first reclaims commands stuck InFlight too long — a bot that
+        // crashed/restarted between MarkInFlight and its ack would otherwise strand them forever,
+        // since nothing else ever re-queries a non-Pending row.
         g.MapGet("/telegram-commands/pending", async (
-            int? batch, CatalogDbContext catalog, TenantDbContextFactory factory, CancellationToken ct) =>
+            int? batch, CatalogDbContext catalog, TenantDbContextFactory factory, IClock clock, CancellationToken ct) =>
         {
+            var now = clock.UtcNow;
             var take = batch is > 0 ? batch.Value : 32;
             var result = new List<PendingCommand>();
 
             var tenants = await catalog.Tenants.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
             foreach (var tenant in tenants)
             {
-                if (result.Count >= take) break;
                 await using var db = factory.ForDatabase(tenant.DatabaseName);
+
+                var staleCutoff = now - StaleInFlightThreshold;
+                var stale = await db.TelegramCommands
+                    .Where(c => c.Status == TelegramCommandStatus.InFlight && c.InFlightAt < staleCutoff)
+                    .ToListAsync(ct);
+                if (stale.Count > 0)
+                {
+                    foreach (var cmd in stale) cmd.ReclaimStale(now, MaxOutboxAttempts);
+                    await db.SaveChangesAsync(ct);
+                }
+
+                if (result.Count >= take) continue;
 
                 var pending = await db.TelegramCommands
                     .Where(c => c.Status == TelegramCommandStatus.Pending)
@@ -527,7 +548,7 @@ public static class InternalEndpoints
                     .ToListAsync(ct);
                 if (pending.Count == 0) continue;
 
-                foreach (var cmd in pending) cmd.MarkInFlight();
+                foreach (var cmd in pending) cmd.MarkInFlight(now);
                 await db.SaveChangesAsync(ct);   // claim them so a second drain pass can't double-send
 
                 foreach (var cmd in pending)

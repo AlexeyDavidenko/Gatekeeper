@@ -182,7 +182,7 @@ public sealed class CrossTenantIntegrationTests(PostgresFixture fixture)
                 .ToListAsync();
             if (pending.Count == 0) continue;
 
-            foreach (var cmd in pending) cmd.MarkInFlight();
+            foreach (var cmd in pending) cmd.MarkInFlight(TestNow);
             await db.SaveChangesAsync();
 
             claimed.AddRange(pending.Select(c => (tenant.Id, c.Id)));

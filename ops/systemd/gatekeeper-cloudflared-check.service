@@ -1,0 +1,8 @@
+[Unit]
+Description=Active health-check for the Gatekeeper cloudflared tunnel (restarts it on a dead connection, not just a dead process)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/cerberus/gatekeeper-deploy/check-cloudflared.sh
