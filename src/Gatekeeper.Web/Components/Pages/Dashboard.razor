@@ -37,22 +37,24 @@ else
     }
     else
     {
-        <table class="grid">
-            <thead>
-                <tr><th>Когда</th><th>Пользователь</th><th>Действие</th><th>Кто решил</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var d in _summary.RecentDecisions)
-                {
-                    <tr>
-                        <td><LocalTime Value="d.CreatedAt" /></td>
-                        <td>@(d.DisplayName ?? "—") @(d.Username is null ? "" : $"(@{d.Username})")</td>
-                        <td>@(d.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</td>
-                        <td>@(d.PerformedByName ?? d.PerformedByUserId.ToString())</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div class="table-wrap">
+            <table class="grid">
+                <thead>
+                    <tr><th>Когда</th><th>Пользователь</th><th>Действие</th><th>Кто решил</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in _summary.RecentDecisions)
+                    {
+                        <tr>
+                            <td><LocalTime Value="d.CreatedAt" /></td>
+                            <td>@(d.DisplayName ?? "—") @(d.Username is null ? "" : $"(@{d.Username})")</td>
+                            <td>@(d.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</td>
+                            <td>@(d.PerformedByName ?? d.PerformedByUserId.ToString())</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 }
 

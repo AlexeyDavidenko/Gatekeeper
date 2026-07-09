@@ -14,37 +14,39 @@ else if (_apps.Count == 0)
 }
 else
 {
-    <table class="grid">
-        <thead>
-            <tr>
-                <th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th>
-                <AuthorizeView Context="ownerContext" Roles="Owner">
-                    <Authorized><th>Кем</th><th>Откуда</th></Authorized>
-                </AuthorizeView>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var a in _apps)
-            {
-                var decision = _decisions.GetValueOrDefault(a.Id);
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
                 <tr>
-                    <td>@a.Id</td>
-                    <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
-                    <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
-                    <td>@(a.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</td>
-                    <td><LocalTime Value="a.SubmittedAt" /></td>
+                    <th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th>
                     <AuthorizeView Context="ownerContext" Roles="Owner">
-                        <Authorized>
-                            <td>@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</td>
-                            <td>@(decision?.Source ?? "—")</td>
-                        </Authorized>
+                        <Authorized><th>Кем</th><th>Откуда</th></Authorized>
                     </AuthorizeView>
-                    <td><a href="applications/@a.Id">Открыть</a></td>
+                    <th></th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var a in _apps)
+                {
+                    var decision = _decisions.GetValueOrDefault(a.Id);
+                    <tr>
+                        <td>@a.Id</td>
+                        <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
+                        <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
+                        <td>@(a.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</td>
+                        <td><LocalTime Value="a.SubmittedAt" /></td>
+                        <AuthorizeView Context="ownerContext" Roles="Owner">
+                            <Authorized>
+                                <td>@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</td>
+                                <td>@(decision?.Source ?? "—")</td>
+                            </Authorized>
+                        </AuthorizeView>
+                        <td><a href="applications/@a.Id">Открыть</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {

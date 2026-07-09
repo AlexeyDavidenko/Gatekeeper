@@ -5,13 +5,13 @@
         <a class="brand" href="/">Gatekeeper</a>
         <AuthorizeView>
             <Authorized>
-                <a class="nav" href="/">Дашборд</a>
-                <a class="nav" href="/queue">Очередь</a>
-                <a class="nav" href="/history">История</a>
-                <a class="nav" href="/questions">Вопросы</a>
+                <NavLink class="nav" href="/" Match="NavLinkMatch.All">Дашборд</NavLink>
+                <NavLink class="nav" href="/queue">Очередь</NavLink>
+                <NavLink class="nav" href="/history">История</NavLink>
+                <NavLink class="nav" href="/questions">Вопросы</NavLink>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>
-                        <a class="nav" href="/visitors">Посетители</a>
+                        <NavLink class="nav" href="/visitors">Посетители</NavLink>
                     </Authorized>
                 </AuthorizeView>
                 <span class="user">@context.User.Identity?.Name</span>

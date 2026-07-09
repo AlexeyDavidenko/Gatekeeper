@@ -14,38 +14,40 @@ else if (_questions.Count == 0)
 }
 else
 {
-    <table class="grid">
-        <thead>
-            <tr><th>#</th><th>Текст</th><th>Тип</th><th>Обязательный</th><th>Активен</th><th></th></tr>
-        </thead>
-        <tbody>
-            @foreach (var q in _questions)
-            {
-                <tr>
-                    <td>@q.Position</td>
-                    <td>@((MarkupString)q.PromptText)</td>
-                    <td>@TypeLabel(q)</td>
-                    <td>@(q.IsRequired ? "да" : "нет")</td>
-                    <td>@(q.IsActive ? "да" : "нет")</td>
-                    <td class="actions">
-                        <form method="post" action="questions/@q.Id/move-up" class="inline">
-                            <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
-                        </form>
-                        <form method="post" action="questions/@q.Id/move-down" class="inline">
-                            <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
-                        </form>
-                        <a href="questions/@q.Id/edit">Редактировать</a>
-                        @if (q.IsActive)
-                        {
-                            <form method="post" action="questions/@q.Id/deactivate" class="inline">
-                                <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr><th>#</th><th>Текст</th><th>Тип</th><th>Обязательный</th><th>Активен</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var q in _questions)
+                {
+                    <tr>
+                        <td>@q.Position</td>
+                        <td>@((MarkupString)q.PromptText)</td>
+                        <td>@TypeLabel(q)</td>
+                        <td>@(q.IsRequired ? "да" : "нет")</td>
+                        <td>@(q.IsActive ? "да" : "нет")</td>
+                        <td class="row-actions">
+                            <form method="post" action="questions/@q.Id/move-up" class="inline">
+                                <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
                             </form>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+                            <form method="post" action="questions/@q.Id/move-down" class="inline">
+                                <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
+                            </form>
+                            <a href="questions/@q.Id/edit">Редактировать</a>
+                            @if (q.IsActive)
+                            {
+                                <form method="post" action="questions/@q.Id/deactivate" class="inline">
+                                    <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 <h2>Добавить вопрос</h2>
