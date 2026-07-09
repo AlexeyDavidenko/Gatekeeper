@@ -39,11 +39,18 @@ public sealed class TelegramUpdateWorker(
         ],
     ]);
 
-    private static readonly InlineKeyboardMarkup LanguagePickerKeyboard = new(
+    // Second row lets someone who tapped "🌐 Сменить язык" by mistake (or just changed their mind)
+    // get back to continuing in their already-detected language, instead of being forced to pick
+    // ru/en explicitly — reuses the existing "lang:go" action, same as the "▶️ Продолжить" button
+    // on the offer keyboard one step earlier.
+    private static InlineKeyboardMarkup LanguagePickerKeyboard(bool ru) => new(
     [
         [
             InlineKeyboardButton.WithCallbackData("🇷🇺 Русский", "lang:ru"),
             InlineKeyboardButton.WithCallbackData("🇬🇧 English", "lang:en"),
+        ],
+        [
+            InlineKeyboardButton.WithCallbackData(ru ? "◀️ Назад" : "◀️ Back", "lang:go"),
         ],
     ]);
 
@@ -222,7 +229,8 @@ public sealed class TelegramUpdateWorker(
                     switch (action)
                     {
                         case "switch":
-                            await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId, LanguagePickerKeyboard, cancellationToken: ct);
+                            await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId,
+                                LanguagePickerKeyboard(IsRussian(cb.From.LanguageCode)), cancellationToken: ct);
                             break;
                         case "go":
                             await SendFirstQuestionAsync(tenantId, cb.From.Id, ct);

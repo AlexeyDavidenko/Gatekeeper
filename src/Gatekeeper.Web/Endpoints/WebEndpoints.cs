@@ -97,7 +97,9 @@ public static class WebEndpoints
             var form = await ctx.Request.ReadFormAsync(ct);
             var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
             var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
-            await api.EditQuestionAsync(id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type), ct);
+            await api.EditQuestionAsync(
+                id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type),
+                form["isActive"] == "true", ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)

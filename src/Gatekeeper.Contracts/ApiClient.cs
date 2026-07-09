@@ -48,7 +48,7 @@ public sealed record QuestionDto(
     long Id, int Position, string PromptText, bool IsRequired, bool IsActive,
     string Type, IReadOnlyList<string>? Options);
 public sealed record CreateQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options);
-public sealed record EditQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options);
+public sealed record EditQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options, bool IsActive);
 
 public sealed record ModerationLogEntry(
     long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,

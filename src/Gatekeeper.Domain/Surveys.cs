@@ -51,6 +51,12 @@ public sealed class Question : AggregateRoot
         IsActive = false;
         UpdatedAt = now;
     }
+
+    public void Activate(DateTimeOffset now)
+    {
+        IsActive = true;
+        UpdatedAt = now;
+    }
 }
 
 /// <summary>

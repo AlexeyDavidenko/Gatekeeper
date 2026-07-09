@@ -269,7 +269,7 @@ public static class QuestionsEndpoints
                 return Results.BadRequest("Invalid question type.");
 
             var configJson = ChoiceOptions.SerializeQuestionOptions(body.Options);
-            await handler.HandleAsync(new EditQuestionCommand(id, type, body.PromptText, body.IsRequired, configJson), ct);
+            await handler.HandleAsync(new EditQuestionCommand(id, type, body.PromptText, body.IsRequired, configJson, body.IsActive), ct);
             return Results.NoContent();
         });
 

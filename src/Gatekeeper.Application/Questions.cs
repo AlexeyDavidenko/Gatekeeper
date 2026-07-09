@@ -7,7 +7,7 @@ namespace Gatekeeper.Application;
 // so question management doesn't expose it as a choosable type.
 
 public sealed record CreateQuestionCommand(QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson);
-public sealed record EditQuestionCommand(long QuestionId, QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson);
+public sealed record EditQuestionCommand(long QuestionId, QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson, bool IsActive);
 public sealed record MoveQuestionCommand(long QuestionId, bool Up);
 public sealed record DeactivateQuestionCommand(long QuestionId);
 
@@ -32,7 +32,14 @@ public sealed class EditQuestionHandler(IQuestionRepository questions, IUnitOfWo
     {
         var question = await questions.GetByIdAsync(cmd.QuestionId, ct)
             ?? throw new InvalidOperationException($"Question {cmd.QuestionId} not found.");
-        question.Edit(cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, clock.UtcNow);
+        var now = clock.UtcNow;
+        question.Edit(cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, now);
+
+        // The list page's own "Скрыть" quick-action already deactivates — this is the only way
+        // back, since until now nothing could ever flip IsActive from false to true again.
+        if (cmd.IsActive && !question.IsActive) question.Activate(now);
+        else if (!cmd.IsActive && question.IsActive) question.Deactivate(now);
+
         await unitOfWork.SaveChangesAsync(ct);
     }
 }
