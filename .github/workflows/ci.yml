@@ -45,6 +45,11 @@ jobs:
       - name: Build
         run: dotnet build Gatekeeper.slnx --no-restore --configuration Release
 
+      # Fast, in-memory unit tests (domain FSM, Telegram Login Widget signature, JSON helpers) —
+      # no Postgres needed, unlike everything below this step.
+      - name: Unit tests
+        run: dotnet test tests/Gatekeeper.Tests --no-build --configuration Release
+
       # Same tool/version used locally (see docs/changelog.md) so `dotnet ef` behaves identically.
       - name: Install dotnet-ef
         run: |

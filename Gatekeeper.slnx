@@ -10,4 +10,7 @@
     <Project Path="src/Gatekeeper.ServiceDefaults/Gatekeeper.ServiceDefaults.csproj" />
     <Project Path="src/Gatekeeper.Web/Gatekeeper.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gatekeeper.Tests/Gatekeeper.Tests.csproj" />
+  </Folder>
 </Solution>
