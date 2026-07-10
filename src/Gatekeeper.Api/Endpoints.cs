@@ -54,6 +54,13 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
 
 public static class ApplicationsEndpoints
 {
+    // word_similarity's own GUC default (0.6) is tuned for full-length comparisons; a single-
+    // character typo on a short 4-8 char first/last name can legitimately knock the score into the
+    // 0.4-0.55 range, so the default would under-match exactly the case this threshold exists for.
+    // Not lower than this, to avoid admitting unrelated names — starting point, sanity-check against
+    // real names if search quality ever needs retuning.
+    private const double FuzzyNameSimilarityThreshold = 0.4;
+
     public static IEndpointRouteBuilder MapApplicationsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/applications");
@@ -165,17 +172,28 @@ public static class ApplicationsEndpoints
             return Results.Ok(result);
         });
 
-        // Fuzzy-ish lookup for the bot's admin "/find" command — matches username/first/last name
-        // regardless of status (unlike the queue above, which defaults to AwaitingReview only).
+        // Lookup for the bot's admin "/find" command — matches username/first/last name regardless
+        // of status (unlike the queue above, which defaults to AwaitingReview only). Username stays
+        // exact-substring only (handles like "@x7k2z" aren't natural-language names — fuzzy-matching
+        // them mostly adds noise); first/last name also gets a trigram word_similarity pass against
+        // NameNormalized so a typo'd or transliterated name still finds the right applicant. Note:
+        // this is the function-call form (word_similarity(a,b) >= threshold), which Postgres's planner
+        // does NOT rewrite into the indexed operator form (%/<%) — the existing GIN gin_trgm_ops index
+        // on NameNormalized does not accelerate this query, it's a per-row scan. Accepted at current
+        // per-tenant data volumes (hundreds-to-low-thousands of rows); if it ever needs to scale, the
+        // fix is switching to the TrigramsAreWordSimilar operator form + a SET LOCAL
+        // pg_trgm.word_similarity_threshold inside a transaction, not attempted here.
         group.MapGet("/search", async (string? q, TenantDbContext db, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(q)) return Results.Ok(new List<ApplicationSummary>());
 
             var pattern = $"%{q.Trim()}%";
+            var normalizedQuery = q.Trim().ToLowerInvariant();
             var matchingUserIds = await db.Users.AsNoTracking()
                 .Where(u => EF.Functions.ILike(u.Username ?? "", pattern) ||
                             EF.Functions.ILike(u.FirstName ?? "", pattern) ||
-                            EF.Functions.ILike(u.LastName ?? "", pattern))
+                            EF.Functions.ILike(u.LastName ?? "", pattern) ||
+                            EF.Functions.TrigramsWordSimilarity(normalizedQuery, u.NameNormalized) >= FuzzyNameSimilarityThreshold)
                 .Select(u => u.TelegramUserId)
                 .ToListAsync(ct);
 
