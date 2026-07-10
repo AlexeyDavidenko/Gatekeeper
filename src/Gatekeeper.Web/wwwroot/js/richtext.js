@@ -1,5 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.rte').forEach(wrapper => {
+// Called from RichTextEditor.razor's own OnAfterRenderAsync — see the comment there for why this is
+// driven by the component's render lifecycle rather than a document-level DOMContentLoaded listener.
+window.gatekeeperRichText = {
+    init(wrapper) {
         const editor = wrapper.querySelector('.rte-editor');
         const hidden = wrapper.querySelector('input[type=hidden]');
         if (!editor || !hidden) return;
@@ -56,5 +58,5 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-    });
-});
+    },
+};

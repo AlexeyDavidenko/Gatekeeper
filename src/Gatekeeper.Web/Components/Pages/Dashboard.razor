@@ -10,25 +10,33 @@
 }
 else
 {
-    <div class="cards">
-        <div class="card">
-            <div class="card-value">@_summary.PendingCount</div>
-            <div class="card-label">Ждут решения</div>
-            <a href="/queue">К очереди →</a>
-        </div>
-        <div class="card">
-            <div class="card-value">@_summary.ApprovedToday / @_summary.RejectedToday</div>
-            <div class="card-label">Одобрено / отклонено сегодня</div>
-        </div>
-        <div class="card">
-            <div class="card-value">@_summary.ApprovedWeek / @_summary.RejectedWeek</div>
-            <div class="card-label">Одобрено / отклонено за 7 дней</div>
-        </div>
-        <div class="card @(_summary.OutboxFailed > 0 ? "card-warn" : "")">
-            <div class="card-value">@_summary.OutboxPending / @_summary.OutboxInFlight / @_summary.OutboxFailed</div>
-            <div class="card-label">Outbox: ожидают / в полёте / ошибки</div>
-        </div>
-    </div>
+    <MudGrid Class="mt-2">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h4">@_summary.PendingCount</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Ждут решения</MudText>
+                <MudLink Href="/queue">К очереди →</MudLink>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h4">@_summary.ApprovedToday / @_summary.RejectedToday</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Одобрено / отклонено сегодня</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h4">@_summary.ApprovedWeek / @_summary.RejectedWeek</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Одобрено / отклонено за 7 дней</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Style="@(_summary.OutboxFailed > 0 ? "border: 2px solid var(--mud-palette-error)" : "")">
+                <MudText Typo="Typo.h4">@_summary.OutboxPending / @_summary.OutboxInFlight / @_summary.OutboxFailed</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Outbox: ожидают / в полёте / ошибки</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 
     <h2>Последние решения</h2>
     @if (_summary.RecentDecisions.Count == 0)
@@ -37,24 +45,20 @@ else
     }
     else
     {
-        <div class="table-wrap">
-            <table class="grid">
-                <thead>
-                    <tr><th>Когда</th><th>Пользователь</th><th>Действие</th><th>Кто решил</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var d in _summary.RecentDecisions)
-                    {
-                        <tr>
-                            <td><LocalTime Value="d.CreatedAt" /></td>
-                            <td>@(d.DisplayName ?? "—") @(d.Username is null ? "" : $"(@{d.Username})")</td>
-                            <td>@(d.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</td>
-                            <td>@(d.PerformedByName ?? d.PerformedByUserId.ToString())</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <MudTable Items="_summary.RecentDecisions" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Когда</MudTh>
+                <MudTh>Пользователь</MudTh>
+                <MudTh>Действие</MudTh>
+                <MudTh>Кто решил</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
+                <MudTd DataLabel="Пользователь">@(context.DisplayName ?? "—") @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
+                <MudTd DataLabel="Действие">@(context.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</MudTd>
+                <MudTd DataLabel="Кто решил">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
+            </RowTemplate>
+        </MudTable>
     }
 }
 

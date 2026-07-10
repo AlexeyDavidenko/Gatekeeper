@@ -1,12 +1,27 @@
+@inject IJSRuntime JS
+
 @if (Value is null)
 {
     <span>—</span>
 }
 else
 {
-    <span class="local-time" data-utc="@Value.Value.ToString("O")">@Value.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
+    <span @ref="_el">@Value.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
 }
 
 @code {
     [Parameter] public DateTimeOffset? Value { get; set; }
+
+    private ElementReference _el;
+
+    // JS interop from this component's own render lifecycle — not a document-level DOMContentLoaded/
+    // enhancedload listener — because navigation between pages happens over the interactive Server
+    // circuit (SignalR), which never fires either of those events; OnAfterRenderAsync(firstRender)
+    // fires once per mounted instance regardless of whether that's a fresh full page load or a
+    // client-side navigation to a newly-rendered page, so it's the mechanism that's actually correct here.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Value is not null)
+            await JS.InvokeVoidAsync("gatekeeperLocalTime.format", _el, Value.Value.ToString("O"));
+    }
 }

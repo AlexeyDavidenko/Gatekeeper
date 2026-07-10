@@ -14,39 +14,34 @@ else if (_apps.Count == 0)
 }
 else
 {
-    <div class="table-wrap">
-        <table class="grid">
-            <thead>
-                <tr>
-                    <th>#</th><th></th><th>Пользователь</th><th>Статус</th><th>Отправлена</th>
-                    <AuthorizeView Context="ownerContext" Roles="Owner">
-                        <Authorized><th>Кем</th><th>Откуда</th></Authorized>
-                    </AuthorizeView>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var a in _apps)
-                {
-                    var decision = _decisions.GetValueOrDefault(a.Id);
-                    <tr>
-                        <td>@a.Id</td>
-                        <td><Avatar PhotoFileId="@a.PhotoFileId" DisplayName="@a.DisplayName" Username="@a.Username" /></td>
-                        <td>@(a.DisplayName ?? "—") @(a.Username is null ? "" : $"(@{a.Username})")</td>
-                        <td>@(a.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</td>
-                        <td><LocalTime Value="a.SubmittedAt" /></td>
-                        <AuthorizeView Context="ownerContext" Roles="Owner">
-                            <Authorized>
-                                <td>@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</td>
-                                <td>@(decision?.Source ?? "—")</td>
-                            </Authorized>
-                        </AuthorizeView>
-                        <td><a href="applications/@a.Id">Открыть</a></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    <MudTable Items="_apps" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>#</MudTh>
+            <MudTh></MudTh>
+            <MudTh>Пользователь</MudTh>
+            <MudTh>Статус</MudTh>
+            <MudTh>Отправлена</MudTh>
+            <AuthorizeView Context="ownerContext" Roles="Owner">
+                <Authorized><MudTh>Кем</MudTh><MudTh>Откуда</MudTh></Authorized>
+            </AuthorizeView>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="#">@context.Id</MudTd>
+            <MudTd><Avatar PhotoFileId="@context.PhotoFileId" DisplayName="@context.DisplayName" Username="@context.Username" /></MudTd>
+            <MudTd DataLabel="Пользователь">@(context.DisplayName ?? "—") @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
+            <MudTd DataLabel="Статус">@(context.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</MudTd>
+            <MudTd DataLabel="Отправлена"><LocalTime Value="context.SubmittedAt" /></MudTd>
+            <AuthorizeView Context="ownerContext" Roles="Owner">
+                <Authorized>
+                    @{ var decision = _decisions.GetValueOrDefault(context.Id); }
+                    <MudTd DataLabel="Кем">@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</MudTd>
+                    <MudTd DataLabel="Откуда">@(decision?.Source ?? "—")</MudTd>
+                </Authorized>
+            </AuthorizeView>
+            <MudTd><a href="applications/@context.Id">Открыть</a></MudTd>
+        </RowTemplate>
+    </MudTable>
 }
 
 @code {

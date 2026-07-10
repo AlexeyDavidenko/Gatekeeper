@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Telegram.Bot" />
     <PackageReference Include="HtmlSanitizer" />
+    <PackageReference Include="MudBlazor" />
   </ItemGroup>
 
   <ItemGroup>

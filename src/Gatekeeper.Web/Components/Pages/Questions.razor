@@ -14,40 +14,40 @@ else if (_questions.Count == 0)
 }
 else
 {
-    <div class="table-wrap">
-        <table class="grid">
-            <thead>
-                <tr><th>#</th><th>Текст</th><th>Тип</th><th>Обязательный</th><th>Активен</th><th></th></tr>
-            </thead>
-            <tbody>
-                @foreach (var q in _questions)
-                {
-                    <tr>
-                        <td>@q.Position</td>
-                        <td>@((MarkupString)q.PromptText)</td>
-                        <td>@TypeLabel(q)</td>
-                        <td>@(q.IsRequired ? "да" : "нет")</td>
-                        <td>@(q.IsActive ? "да" : "нет")</td>
-                        <td class="row-actions">
-                            <form method="post" action="questions/@q.Id/move-up" class="inline">
-                                <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
-                            </form>
-                            <form method="post" action="questions/@q.Id/move-down" class="inline">
-                                <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
-                            </form>
-                            <a href="questions/@q.Id/edit">Редактировать</a>
-                            @if (q.IsActive)
-                            {
-                                <form method="post" action="questions/@q.Id/deactivate" class="inline">
-                                    <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
-                                </form>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    <MudTable Items="_questions" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>#</MudTh>
+            <MudTh>Текст</MudTh>
+            <MudTh>Тип</MudTh>
+            <MudTh>Обязательный</MudTh>
+            <MudTh>Активен</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="#">@context.Position</MudTd>
+            <MudTd DataLabel="Текст">@((MarkupString)context.PromptText)</MudTd>
+            <MudTd DataLabel="Тип">@TypeLabel(context)</MudTd>
+            <MudTd DataLabel="Обязательный">@(context.IsRequired ? "да" : "нет")</MudTd>
+            <MudTd DataLabel="Активен">@(context.IsActive ? "да" : "нет")</MudTd>
+            <MudTd>
+                <div class="row-actions">
+                    <form method="post" action="questions/@context.Id/move-up" class="inline">
+                        <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
+                    </form>
+                    <form method="post" action="questions/@context.Id/move-down" class="inline">
+                        <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
+                    </form>
+                    <a href="questions/@context.Id/edit">Редактировать</a>
+                    @if (context.IsActive)
+                    {
+                        <form method="post" action="questions/@context.Id/deactivate" class="inline">
+                            <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
+                        </form>
+                    }
+                </div>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
 }
 
 <h2>Добавить вопрос</h2>

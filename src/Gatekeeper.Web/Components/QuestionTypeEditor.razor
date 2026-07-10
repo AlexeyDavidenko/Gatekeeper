@@ -1,10 +1,12 @@
 @* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Options are
    posted back as repeated "options" form fields (add/remove rows handled client-side by
-   wwwroot/js/questionoptions.js — this project has no interactive Blazor runtime, so all of this
-   is progressive enhancement on top of a plain form post). Captcha isn't offered — no rendering or
+   wwwroot/js/questionoptions.js, a plain form post — not rewritten to a direct C# call, see
+   docs/backlog.md on the MudBlazor migration for why). Captcha isn't offered — no rendering or
    answer-parsing exists for it yet. *@
+@inject IJSRuntime JS
+
 <label>Тип ответа:
-    <select name="type" class="q-type-select">
+    <select name="type" class="q-type-select" @ref="_select">
         <option value="Text" selected="@(Type == "Text")">Текст</option>
         <option value="SingleChoice" selected="@(Type == "SingleChoice")">Один вариант (radio)</option>
         <option value="MultiChoice" selected="@(Type == "MultiChoice")">Несколько вариантов (checkbox)</option>
@@ -30,4 +32,15 @@
 @code {
     [Parameter] public string Type { get; set; } = "Text";
     [Parameter] public IReadOnlyList<string>? Options { get; set; }
+
+    private ElementReference _select;
+
+    // Driven by this component's own render lifecycle, not a document-level DOMContentLoaded/
+    // enhancedload listener — see the comment in LocalTime.razor for why (navigation happens over
+    // the interactive Server circuit, which never fires either of those page-load events).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("gatekeeperQuestionOptions.init", _select);
+    }
 }

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <title>Gatekeeper</title>
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <style>
         :root {
             color-scheme: light dark;
@@ -47,19 +48,10 @@
         h1 { font-size: 1.5rem; margin: 1rem 0; }
         h2 { font-size: 1.15rem; margin: 1.75rem 0 .75rem; }
         .page { max-width: 860px; margin: 0 auto; padding: 0 1rem 3rem; }
-        .topbar { display: flex; align-items: center; gap: .25rem 1rem; flex-wrap: wrap; padding: 1rem 0; border-bottom: 1px solid var(--border); }
-        .brand { font-weight: 700; text-decoration: none; color: inherit; margin-right: auto; font-size: 1.1rem; }
-        .nav { text-decoration: none; color: var(--muted-fg); padding: .3rem 0; border-bottom: 2px solid transparent; }
-        .nav:hover { color: var(--fg); }
-        .nav.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
         .user { opacity: .7; font-size: .9rem; }
         .inline { display: inline; }
         button.link { background: none; border: none; color: var(--link); cursor: pointer; padding: 0; font-size: 1rem; }
         button.link:hover { text-decoration: underline; }
-        .table-wrap { overflow-x: auto; margin-top: 1rem; }
-        table.grid { width: 100%; border-collapse: collapse; }
-        table.grid th, table.grid td { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
-        table.grid tbody tr:hover { background: var(--surface-hover); }
         .muted { opacity: .7; }
         .error { color: var(--danger); }
         .answers { margin: 1rem 0; }
@@ -74,11 +66,6 @@
         button.reject { background: var(--danger); }
         button.reject:hover { background: var(--danger-hover); }
         input[type=text] { padding: .45rem .5rem; border: 1px solid var(--border); border-radius: .375rem; background: var(--bg); color: var(--fg); max-width: 100%; }
-        .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
-        .card { flex: 1 1 180px; border: 1px solid var(--border); background: var(--card-bg); border-radius: .5rem; padding: 1rem; }
-        .card-value { font-size: 1.5rem; font-weight: 700; }
-        .card-label { opacity: .7; font-size: .85rem; margin-top: .25rem; }
-        .card-warn { border-color: var(--danger); }
         .avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: .5rem; }
         .avatar-fallback { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: .8rem; }
         .avatar-lg { width: 72px; height: 72px; font-size: 1.5rem; }
@@ -100,16 +87,24 @@
 
         @@media (max-width: 640px) {
             .page { padding: 0 .75rem 2rem; }
-            .topbar { gap: .5rem .75rem; }
             .actions { flex-direction: column; gap: .75rem; }
-            .cards { gap: .75rem; }
-            .card { flex-basis: 100%; }
+
+            /* MudBlazor ships mud-grid-item-{sm,md}-* as plain, unconditional classes (no media
+               query of its own — the breakpoint is normally resolved by its own JS resize
+               listener) — this is a plain CSS fallback that forces full-width stacking below the
+               same breakpoint the rest of this file already uses, and an unwrapped nav so it
+               doesn't overflow the viewport like the old plain-CSS .topbar never did either. */
+            .mud-grid-item-sm-6, .mud-grid-item-md-3 { max-width: 100%; flex-basis: 100%; }
+            .mud-appbar { flex-wrap: wrap; height: auto; }
         }
     </style>
     <HeadOutlet />
 </head>
 <body>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/theme.js"></script>
     <script src="js/localtime.js"></script>
     <script src="js/richtext.js"></script>
     <script src="js/questionoptions.js"></script>

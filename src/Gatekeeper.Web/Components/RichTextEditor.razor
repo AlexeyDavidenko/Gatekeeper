@@ -2,7 +2,9 @@
    bold/italic/underline/strikethrough/code/links. No block elements: question prompts are
    single-line, so Enter is suppressed client-side (see richtext.js) rather than dealing with
    <div>/<br> vs literal "\n" conversion for something this short. *@
-<div class="rte">
+@inject IJSRuntime JS
+
+<div class="rte" @ref="_wrapper">
     <div class="rte-toolbar">
         <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
         <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
@@ -21,4 +23,14 @@
     [Parameter] public bool Required { get; set; } = true;
 
     private readonly string _id = "rte-" + Guid.NewGuid().ToString("N");
+    private ElementReference _wrapper;
+
+    // Driven by this component's own render lifecycle, not a document-level DOMContentLoaded/
+    // enhancedload listener — see the comment in LocalTime.razor for why (navigation happens over
+    // the interactive Server circuit, which never fires either of those page-load events).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("gatekeeperRichText.init", _wrapper);
+    }
 }

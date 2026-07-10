@@ -5,14 +5,17 @@ using Gatekeeper.Web.Endpoints;
 using Gatekeeper.Web.Services;
 using Gatekeeper.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using MudBlazor.Services;
 using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();   // Aspire: OTel, health checks, and — critically — HTTP service discovery + resilience
 
-builder.Services.AddRazorComponents();               // static SSR (no interactive render modes)
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();  // exposes HttpContext.User to components
+builder.Services.AddMudServices();
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -57,6 +60,6 @@ app.UseAntiforgery();
 
 app.MapDefaultEndpoints();        // /health, /alive (Aspire) — Development-only, see ServiceDefaults
 app.MapWebEndpoints();            // /auth/* and /applications/* form posts
-app.MapRazorComponents<App>();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();

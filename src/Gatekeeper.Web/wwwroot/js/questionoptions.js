@@ -1,13 +1,19 @@
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.q-type-select').forEach(select => {
+// select-toggle wiring is called from QuestionTypeEditor.razor's own OnAfterRenderAsync — see the
+// comment there for why this is driven by the component's render lifecycle rather than a
+// document-level DOMContentLoaded listener.
+window.gatekeeperQuestionOptions = {
+    init(select) {
         const optionsBlock = select.closest('form')?.querySelector('.q-options');
         if (!optionsBlock) return;
         const sync = () => { optionsBlock.hidden = select.value !== 'SingleChoice' && select.value !== 'MultiChoice'; };
         select.addEventListener('change', sync);
         sync();
-    });
-});
+    },
+};
 
+// Add/remove option rows: delegated on `document` itself, attached once, forever — unlike the
+// per-instance wiring above, this never needs re-attaching, since it isn't tied to any specific
+// rendered node that Blazor might later replace.
 document.addEventListener('click', (e) => {
     const addBtn = e.target.closest('.q-add-option');
     if (addBtn) {

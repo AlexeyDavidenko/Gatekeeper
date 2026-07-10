@@ -1,19 +1,27 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<ReconnectModal />
 
 <div class="page">
-    <header class="topbar">
-        <a class="brand" href="/">Gatekeeper</a>
+    <MudAppBar Elevation="1" Dense="true" Fixed="false">
+        <MudText Typo="Typo.h6" Class="mr-4">Gatekeeper</MudText>
         <AuthorizeView>
             <Authorized>
-                <NavLink class="nav" href="/" Match="NavLinkMatch.All">Дашборд</NavLink>
-                <NavLink class="nav" href="/queue">Очередь</NavLink>
-                <NavLink class="nav" href="/history">История</NavLink>
-                <NavLink class="nav" href="/questions">Вопросы</NavLink>
+                <MudNavLink Href="/" Match="NavLinkMatch.All">Дашборд</MudNavLink>
+                <MudNavLink Href="/queue">Очередь</MudNavLink>
+                <MudNavLink Href="/history">История</MudNavLink>
+                <MudNavLink Href="/questions">Вопросы</MudNavLink>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>
-                        <NavLink class="nav" href="/visitors">Посетители</NavLink>
+                        <MudNavLink Href="/visitors">Посетители</MudNavLink>
                     </Authorized>
                 </AuthorizeView>
+                <MudSpacer />
                 <span class="user">@context.User.Identity?.Name</span>
                 <form method="post" action="auth/logout" class="inline">
                     <AntiforgeryToken />
@@ -21,8 +29,29 @@
                 </form>
             </Authorized>
         </AuthorizeView>
-    </header>
+    </MudAppBar>
     <main>
         @Body
     </main>
 </div>
+
+@code {
+    private bool _isDarkMode;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight { Primary = "#2563eb" },
+        PaletteDark = new PaletteDark { Primary = "#6ea8fe" },
+    };
+
+    // OS dark-mode preference is read once per circuit at startup — matches the existing plain-CSS
+    // pages, which also only ever apply prefers-color-scheme at load, never live-react mid-session.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isDarkMode = await JS.InvokeAsync<bool>("gatekeeperTheme.prefersDark");
+            StateHasChanged();
+        }
+    }
+}

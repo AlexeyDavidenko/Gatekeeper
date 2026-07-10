@@ -14,32 +14,30 @@ else if (_visits.Count == 0)
 }
 else
 {
-    <div class="table-wrap">
-        <table class="grid">
-            <thead>
-                <tr>
-                    <th>Когда</th><th>Пользователь</th><th>IP</th><th>Путь</th><th>Метод</th>
-                    <th>Статус</th><th>Мс</th><th>Откуда пришёл</th><th>User-Agent</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var v in _visits)
-                {
-                    <tr>
-                        <td><LocalTime Value="v.CreatedAt" /></td>
-                        <td>@(v.UserName ?? (v.UserId?.ToString() ?? "—"))</td>
-                        <td>@(v.IpAddress ?? "—")</td>
-                        <td>@v.Path</td>
-                        <td>@v.Method</td>
-                        <td>@v.StatusCode</td>
-                        <td>@v.DurationMs</td>
-                        <td class="truncate" title="@v.Referrer">@(v.Referrer ?? "—")</td>
-                        <td class="truncate" title="@v.UserAgent">@(v.UserAgent ?? "—")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    <MudTable Items="_visits" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Когда</MudTh>
+            <MudTh>Пользователь</MudTh>
+            <MudTh>IP</MudTh>
+            <MudTh>Путь</MudTh>
+            <MudTh>Метод</MudTh>
+            <MudTh>Статус</MudTh>
+            <MudTh>Мс</MudTh>
+            <MudTh>Откуда пришёл</MudTh>
+            <MudTh>User-Agent</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
+            <MudTd DataLabel="Пользователь">@(context.UserName ?? (context.UserId?.ToString() ?? "—"))</MudTd>
+            <MudTd DataLabel="IP">@(context.IpAddress ?? "—")</MudTd>
+            <MudTd DataLabel="Путь">@context.Path</MudTd>
+            <MudTd DataLabel="Метод">@context.Method</MudTd>
+            <MudTd DataLabel="Статус">@context.StatusCode</MudTd>
+            <MudTd DataLabel="Мс">@context.DurationMs</MudTd>
+            <MudTd DataLabel="Откуда пришёл"><span class="truncate" title="@context.Referrer">@(context.Referrer ?? "—")</span></MudTd>
+            <MudTd DataLabel="User-Agent"><span class="truncate" title="@context.UserAgent">@(context.UserAgent ?? "—")</span></MudTd>
+        </RowTemplate>
+    </MudTable>
 }
 
 @code {
