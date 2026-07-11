@@ -1,5 +1,9 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject CircuitVisitContext VisitContext
+@inject SiteVisitQueue VisitQueue
 
 <MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -37,12 +41,42 @@
 
 @code {
     private bool _isDarkMode;
+    private string _previousPath = "/";
 
     private readonly MudTheme _theme = new()
     {
         PaletteLight = new PaletteLight { Primary = "#2563eb" },
         PaletteDark = new PaletteDark { Primary = "#6ea8fe" },
     };
+
+    protected override void OnInitialized()
+    {
+        _previousPath = CurrentPath();
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    // The current/initial location is already tracked with full, real HTTP detail by
+    // SiteVisitMiddleware — this only fires for later in-circuit client-side navigations (e.g.
+    // MudNavLink clicks), which stay on the open SignalR connection and never touch that
+    // middleware at all. Method/StatusCode/DurationMs are synthetic markers: no real HTTP
+    // request/response exists for these, so there's nothing genuine to report. Referrer is
+    // repurposed as the previous in-circuit path, which is more useful here than a real HTTP
+    // Referer would be for SPA-style navigation.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var path = CurrentPath();
+        VisitQueue.Enqueue(new RecordSiteVisitRequest(
+            VisitContext.UserId, VisitContext.UserName, VisitContext.SessionId, VisitContext.IpAddress,
+            path, "BLAZOR", 200, 0, VisitContext.UserAgent, _previousPath));
+        _previousPath = path;
+    }
+
+    private string CurrentPath()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri);
+        var cut = relative.IndexOfAny(['?', '#']);
+        return "/" + (cut >= 0 ? relative[..cut] : relative);
+    }
 
     // OS dark-mode preference is read once per circuit at startup — matches the existing plain-CSS
     // pages, which also only ever apply prefers-color-scheme at load, never live-react mid-session.
@@ -54,4 +88,6 @@
             StateHasChanged();
         }
     }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
 }

@@ -66,9 +66,57 @@ public static class NonBrowserUserAgentDetector
 }
 
 /// <summary>
+/// Client IP resolution shared by the HTTP-tracked half of the visit log (SiteVisitMiddleware)
+/// and the Blazor-circuit half (CircuitVisitContext), so both agree on one CDN/proxy fallback
+/// chain instead of drifting apart.
+/// </summary>
+public static class SiteVisitClientIp
+{
+    public static string? Resolve(HttpContext ctx) =>
+        ctx.Request.Headers["CF-Connecting-IP"].FirstOrDefault()
+        ?? ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
+        ?? ctx.Connection.RemoteIpAddress?.ToString();
+}
+
+/// <summary>
+/// Snapshots the identity/IP/UA/session-id of the request that established this Blazor circuit —
+/// captured once, here, because none of these are reliably available for the rest of the
+/// circuit's lifetime (SignalR traffic after the initial connect carries no HttpContext). Scoped:
+/// DI gives every circuit its own instance, built on first injection (MainLayout), which for an
+/// InteractiveServer circuit happens while IHttpContextAccessor.HttpContext still reflects either
+/// the prerendering request or the /_blazor connect request that immediately follows it — both
+/// carry the same cookies/headers as the page the visitor loaded.
+/// </summary>
+public sealed class CircuitVisitContext
+{
+    public long? UserId { get; }
+    public string? UserName { get; }
+    public string SessionId { get; }
+    public string? IpAddress { get; }
+    public string? UserAgent { get; }
+
+    public CircuitVisitContext(IHttpContextAccessor accessor)
+    {
+        var ctx = accessor.HttpContext;
+        UserId = long.TryParse(ctx?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (long?)null;
+        UserName = ctx?.User.Identity?.Name;
+        // ctx.Items first: a brand-new visitor's cookie was only just written to the response by
+        // SiteVisitMiddleware, not readable back off the request — see that middleware for the stash.
+        SessionId = ctx?.Items["gk_sid"] as string
+            ?? ctx?.Request.Cookies["gk_sid"]
+            ?? Guid.NewGuid().ToString("N");
+        IpAddress = ctx is null ? null : SiteVisitClientIp.Resolve(ctx);
+        UserAgent = ctx?.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
+    }
+}
+
+/// <summary>
 /// Captures one page view per request (method, path, status, duration, who, IP, UA, referrer) and
 /// hands it to <see cref="SiteVisitQueue"/> — never awaited inline, see that type's doc comment.
 /// Must run after auth middleware (needs ctx.User) and after static files (so assets never reach it).
+/// Only ever sees the FIRST page load of a circuit and non-Blazor HTTP endpoints (form posts,
+/// /auth/*) — everything after that is in-app SignalR navigation, tracked separately by
+/// MainLayout's NavigationManager.LocationChanged handler (see CircuitVisitContext above).
 /// </summary>
 public sealed class SiteVisitMiddleware(RequestDelegate next, SiteVisitQueue queue)
 {
@@ -78,6 +126,14 @@ public sealed class SiteVisitMiddleware(RequestDelegate next, SiteVisitQueue que
         // them, see Program.cs ordering) — this just filters the one dynamic-but-uninteresting
         // endpoint left: the avatar image proxy, which fires once per <img> tag, not per page view.
         if (ctx.Request.Path.StartsWithSegments("/avatar"))
+        {
+            await next(ctx);
+            return;
+        }
+
+        // SignalR's own handshake/keepalive traffic for the Blazor circuit — never a page view.
+        // Real in-app navigation is tracked from inside the circuit instead (see class doc above).
+        if (ctx.Request.Path.StartsWithSegments("/_blazor"))
         {
             await next(ctx);
             return;
@@ -104,6 +160,10 @@ public sealed class SiteVisitMiddleware(RequestDelegate next, SiteVisitQueue que
             });
         }
 
+        // Lets CircuitVisitContext (built later, while handling this same request) pick up the
+        // session id even when it was only just minted above and isn't in the request's cookies yet.
+        ctx.Items["gk_sid"] = sessionId;
+
         var sw = Stopwatch.StartNew();
         try
         {
@@ -114,9 +174,7 @@ public sealed class SiteVisitMiddleware(RequestDelegate next, SiteVisitQueue que
             sw.Stop();
 
             var userId = long.TryParse(ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (long?)null;
-            var ip = ctx.Request.Headers["CF-Connecting-IP"].FirstOrDefault()
-                ?? ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
-                ?? ctx.Connection.RemoteIpAddress?.ToString();
+            var ip = SiteVisitClientIp.Resolve(ctx);
 
             queue.Enqueue(new RecordSiteVisitRequest(
                 userId,

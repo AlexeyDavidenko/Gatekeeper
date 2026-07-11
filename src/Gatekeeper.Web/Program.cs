@@ -11,6 +11,7 @@ using Telegram.Bot;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();   // Aspire: OTel, health checks, and — critically — HTTP service discovery + resilience
+builder.Services.AddHttpContextAccessor();   // lets CircuitVisitContext snapshot the request that opened a circuit
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -44,6 +45,7 @@ builder.Services.AddHttpClient<AdminApiClient>(http =>
 // worker — see SiteVisitLogging.cs for why this must never sit on the request-serving path.
 builder.Services.AddSingleton<SiteVisitQueue>();
 builder.Services.AddHostedService<SiteVisitFlushWorker>();
+builder.Services.AddScoped<CircuitVisitContext>();
 
 var app = builder.Build();
 
