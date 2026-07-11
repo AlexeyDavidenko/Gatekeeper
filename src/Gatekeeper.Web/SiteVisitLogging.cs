@@ -47,6 +47,25 @@ public sealed class SiteVisitFlushWorker(
 }
 
 /// <summary>
+/// Scripted/health-check clients (curl, wget, uptime monitors) hit public pages like /login on a
+/// fixed interval forever — found one doing exactly this every ~2 minutes, drowning out real visits
+/// (84% of all recorded rows). A missing UA gets the same treatment; real browsers always send one.
+/// </summary>
+public static class NonBrowserUserAgentDetector
+{
+    // Prefix match against the token each of these clients puts at the start of its UA string.
+    private static readonly string[] Prefixes =
+    [
+        "curl/", "Wget/", "python-requests/", "python-httpx/", "Go-http-client/",
+        "okhttp/", "PostmanRuntime/", "Java/", "Apache-HttpClient/", "axios/", "node-fetch",
+    ];
+
+    public static bool IsBot(string? userAgent) =>
+        string.IsNullOrWhiteSpace(userAgent) ||
+        Prefixes.Any(p => userAgent.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+}
+
+/// <summary>
 /// Captures one page view per request (method, path, status, duration, who, IP, UA, referrer) and
 /// hands it to <see cref="SiteVisitQueue"/> — never awaited inline, see that type's doc comment.
 /// Must run after auth middleware (needs ctx.User) and after static files (so assets never reach it).
@@ -59,6 +78,12 @@ public sealed class SiteVisitMiddleware(RequestDelegate next, SiteVisitQueue que
         // them, see Program.cs ordering) — this just filters the one dynamic-but-uninteresting
         // endpoint left: the avatar image proxy, which fires once per <img> tag, not per page view.
         if (ctx.Request.Path.StartsWithSegments("/avatar"))
+        {
+            await next(ctx);
+            return;
+        }
+
+        if (NonBrowserUserAgentDetector.IsBot(ctx.Request.Headers.UserAgent.ToString()))
         {
             await next(ctx);
             return;
