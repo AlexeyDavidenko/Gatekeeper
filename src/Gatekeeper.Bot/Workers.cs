@@ -178,6 +178,18 @@ public sealed class TelegramUpdateWorker(
             {
                 if (router.Resolve(from.Id) is not { } tenantId) break;  // no active survey for this user
                 var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(from.Id, msg.Text), ct);
+                if (next is null)
+                {
+                    // Sent free text instead of tapping a language-picker button — the survey hasn't
+                    // actually started yet, so this isn't a real answer. Remind them instead of
+                    // silently swallowing it (see StartSurveyHandler for why this can no longer
+                    // silently start the survey).
+                    var ru = IsRussian(from.LanguageCode);
+                    await bot.SendMessage(from.Id, ru
+                        ? "Пожалуйста, сначала нажмите одну из кнопок выше, чтобы начать анкету."
+                        : "Please tap one of the buttons above first to start the questionnaire.", cancellationToken: ct);
+                    break;
+                }
                 await AdvanceAsync(from.Id, next, ct);
                 break;
             }
@@ -254,7 +266,7 @@ public sealed class TelegramUpdateWorker(
                     var parts = data.Split(':');
                     var index = int.Parse(parts[2]);
                     var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(cb.From.Id, null, [index]), ct);
-                    await AdvanceAsync(cb.From.Id, next, ct);
+                    if (next is not null) await AdvanceAsync(cb.From.Id, next, ct);
                 }
                 await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
                 break;
@@ -289,7 +301,7 @@ public sealed class TelegramUpdateWorker(
                     var mask = int.Parse(parts[2]);
                     var indices = Enumerable.Range(0, 31).Where(i => (mask & (1 << i)) != 0).ToList();
                     var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(cb.From.Id, null, indices), ct);
-                    await AdvanceAsync(cb.From.Id, next, ct);
+                    if (next is not null) await AdvanceAsync(cb.From.Id, next, ct);
                 }
                 await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
                 break;
@@ -308,9 +320,8 @@ public sealed class TelegramUpdateWorker(
 
     private async Task SendFirstQuestionAsync(long tenantId, long userId, CancellationToken ct)
     {
-        var q = await api.GetFirstActiveQuestionAsync(tenantId, ct);
-        if (q is not null)
-            await SendQuestionAsync(userId, q.Id, q.PromptText, q.Type, q.Options, ct);
+        var next = await api.StartSurveyAsync(tenantId, userId, ct);
+        await AdvanceAsync(userId, next, ct);
     }
 
     /// <summary>Completion or next-question dispatch — shared by the free-text and button-tap paths.</summary>

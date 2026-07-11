@@ -46,6 +46,7 @@ builder.Services.AddScoped<DecideApplicationHandler>();
 builder.Services.AddScoped<ToggleCardAnswersHandler>();
 builder.Services.AddScoped<CreateApplicationHandler>();
 builder.Services.AddScoped<SubmitAnswerHandler>();
+builder.Services.AddScoped<StartSurveyHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();
 builder.Services.AddScoped<CreateQuestionHandler>();
 builder.Services.AddScoped<EditQuestionHandler>();

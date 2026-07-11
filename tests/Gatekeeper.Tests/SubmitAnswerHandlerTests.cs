@@ -42,29 +42,29 @@ public class SubmitAnswerHandlerTests
     }
 
     [Fact]
-    public async Task FirstMessage_Starts_Survey_When_Application_At_SurveyOffered()
+    public async Task SubmitAnswer_Throws_SurveyNotStartedException_When_Still_At_SurveyOffered()
     {
         var apps = new FakeApplicationRepository();
         var questions = new FakeQuestionRepository();
 
-        // Seed an application at SurveyOffered status (not yet started)
+        // Seed an application at SurveyOffered status (not yet started) — same setup as before this
+        // was fixed, but now a stray message must NOT silently start the survey and consume itself
+        // as the answer to question #1 (see StartSurveyHandler for the correct, explicit way to start).
         var application = DomainApplication.FromJoinRequest(TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
         application.MarkSurveyOffered();
         apps.Seed(application, id: 1);
 
-        // Seed two Text questions so we can verify advance
         var q1 = Question.Create(1, QuestionType.Text, "Question 1?", isRequired: true, configJson: null, TestNow);
         questions.Seed(q1);
-        var q2 = Question.Create(2, QuestionType.Text, "Question 2?", isRequired: true, configJson: null, TestNow);
-        questions.Seed(q2);
 
         var handler = CreateHandler(apps, questions);
-        var result = await handler.HandleAsync(new SubmitAnswerCommand(TestTelegramUserId, Text: "First answer", null));
 
-        // Survey started and advanced to next question
-        Assert.False(result.Completed);
-        Assert.Equal(q2.Id, result.QuestionId);
-        Assert.Single(apps.Store[1].Answers);
+        await Assert.ThrowsAsync<SurveyNotStartedException>(() =>
+            handler.HandleAsync(new SubmitAnswerCommand(TestTelegramUserId, Text: "First answer", null)));
+
+        // Nothing recorded, status untouched — the stray message was rejected, not consumed.
+        Assert.Empty(apps.Store[1].Answers);
+        Assert.Equal(ApplicationStatus.SurveyOffered, apps.Store[1].Status);
     }
 
     [Fact]

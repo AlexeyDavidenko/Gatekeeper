@@ -101,7 +101,9 @@ public sealed record InProgressApplicant(long TenantId, long TelegramUserId);
 public interface IGatekeeperApiClient
 {
     Task<NextQuestionDto> CreateApplicationAsync(long tenantId, CreateApplicationRequest request, CancellationToken ct = default);
-    Task<NextQuestionDto> SubmitAnswerAsync(long tenantId, SubmitAnswerRequest request, CancellationToken ct = default);
+    // Null means the survey hasn't been explicitly started yet (409 from the API) — a stray message
+    // sent instead of tapping a language-picker button, not a real answer. See StartSurveyAsync.
+    Task<NextQuestionDto?> SubmitAnswerAsync(long tenantId, SubmitAnswerRequest request, CancellationToken ct = default);
     Task DecideAsync(long tenantId, long applicationId, uint rowVersion, DecideRequest request, CancellationToken ct = default);
     Task ModerateAsync(long tenantId, long telegramUserId, ModerationRequest request, CancellationToken ct = default);
     Task HandleAdminCallbackAsync(long tenantId, AdminCallbackRequest request, CancellationToken ct = default);
@@ -111,12 +113,13 @@ public interface IGatekeeperApiClient
     Task AckTelegramCommandAsync(long tenantId, long commandId, CommandResult result, CancellationToken ct = default);
     Task<IReadOnlyList<InProgressApplicant>> GetInProgressApplicantsAsync(CancellationToken ct = default);
 
-    // Bot-side language picker: the first active question (fetched again once the user resolves
-    // the language prompt, since it's not sent immediately at join request anymore) and persisting
-    // an explicit language choice so later messages — including ones sent by a different process,
-    // like a decision made from the website — pick it up.
-    Task<QuestionDto?> GetFirstActiveQuestionAsync(long tenantId, CancellationToken ct = default);
+    // Bot-side language picker: persisting an explicit language choice so later messages —
+    // including ones sent by a different process, like a decision made from the website — pick it up.
     Task SetUserLanguageAsync(long tenantId, long telegramUserId, string languageCode, CancellationToken ct = default);
+
+    // Explicitly starts the survey (SurveyOffered → InSurvey) — called only from the language-picker's
+    // "lang:go"/"lang:ru"/"lang:en" callbacks, never implicitly from a plain message.
+    Task<NextQuestionDto> StartSurveyAsync(long tenantId, long telegramUserId, CancellationToken ct = default);
 
     // Admin-group bot commands ("/stats", "/pending", "/find") and the applicant's own "/status".
     Task<DashboardSummary> GetDashboardAsync(long tenantId, CancellationToken ct = default);

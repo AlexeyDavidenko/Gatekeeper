@@ -94,3 +94,8 @@ public interface ITelegramCommandQueue
 
 /// <summary>Raised when an optimistic-concurrency check fails (another decision won the race).</summary>
 public sealed class ConcurrencyConflictException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>Raised when an answer is submitted before the survey has been explicitly started via
+/// StartSurveyHandler (i.e. the applicant sent a stray message instead of tapping a language-picker
+/// button) — see docs/changelog.md 2026-07-11 for why this must reject rather than silently start.</summary>
+public sealed class SurveyNotStartedException(string message) : Exception(message);

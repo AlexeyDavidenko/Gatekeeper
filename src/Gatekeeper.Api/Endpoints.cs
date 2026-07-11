@@ -101,13 +101,22 @@ public static class ApplicationsEndpoints
         });
 
         // Submit a survey answer (active application resolved by user id) → next question or completion.
+        // 409 if the survey hasn't been explicitly started yet (see StartSurveyHandler) — a stray
+        // message sent before tapping a language-picker button, not a real answer.
         group.MapPost("/answers", async (SubmitAnswerRequest body, SubmitAnswerHandler handler, CancellationToken ct) =>
         {
-            var step = await handler.HandleAsync(
-                new SubmitAnswerCommand(body.TelegramUserId, body.Text, body.SelectedOptionIndexes), ct);
-            return Results.Ok(new NextQuestionDto(
-                step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed,
-                step.LanguageCode, step.Options));
+            try
+            {
+                var step = await handler.HandleAsync(
+                    new SubmitAnswerCommand(body.TelegramUserId, body.Text, body.SelectedOptionIndexes), ct);
+                return Results.Ok(new NextQuestionDto(
+                    step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed,
+                    step.LanguageCode, step.Options));
+            }
+            catch (SurveyNotStartedException)
+            {
+                return Results.StatusCode(StatusCodes.Status409Conflict);
+            }
         });
 
         // Admin-group button press. Data is "appr:{id}" / "rej:{id}" (decision) or
@@ -262,15 +271,6 @@ public static class QuestionsEndpoints
             return q is null ? Results.NotFound() : Results.Ok(ToDto(q));
         });
 
-        // Bot's language picker re-fetches this once the user resolves the language prompt — the
-        // bot no longer sends the first question immediately at join request, it waits for that.
-        group.MapGet("/first-active", async (TenantDbContext db, CancellationToken ct) =>
-        {
-            var q = await db.Questions.AsNoTracking()
-                .Where(x => x.IsActive).OrderBy(x => x.Position).FirstOrDefaultAsync(ct);
-            return q is null ? Results.NotFound() : Results.Ok(ToDto(q));
-        });
-
         group.MapPost("/", async (CreateQuestionRequest body, CreateQuestionHandler handler, CancellationToken ct) =>
         {
             if (!Enum.TryParse<QuestionType>(body.Type, out var type))
@@ -329,6 +329,18 @@ public static class ModerationEndpoints
         {
             await handler.HandleAsync(new SetUserLanguageCommand(telegramUserId, body.LanguageCode), ct);
             return Results.NoContent();
+        });
+
+        // Explicit "start the survey" trigger for the language-picker's "lang:go"/"lang:ru"/"lang:en"
+        // callbacks — see StartSurveyHandler for why this must be a distinct, deliberate action
+        // rather than something a stray message can trigger as a side effect.
+        app.MapPost("/users/{telegramUserId:long}/start-survey", async (
+            long telegramUserId, StartSurveyHandler handler, CancellationToken ct) =>
+        {
+            var step = await handler.HandleAsync(new StartSurveyCommand(telegramUserId), ct);
+            return Results.Ok(new NextQuestionDto(
+                step.QuestionId, step.Prompt, step.Type ?? nameof(QuestionType.Text), step.Completed,
+                step.LanguageCode, step.Options));
         });
 
         app.MapPost("/users/{telegramUserId:long}/moderation", async (

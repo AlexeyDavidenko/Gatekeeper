@@ -17,9 +17,10 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
         return (await res.Content.ReadFromJsonAsync<NextQuestionDto>(ct))!;
     }
 
-    public async Task<NextQuestionDto> SubmitAnswerAsync(long tenantId, SubmitAnswerRequest request, CancellationToken ct = default)
+    public async Task<NextQuestionDto?> SubmitAnswerAsync(long tenantId, SubmitAnswerRequest request, CancellationToken ct = default)
     {
         using var res = await http.SendAsync(Build(HttpMethod.Post, "/applications/answers", tenantId, request), ct);
+        if (res.StatusCode == HttpStatusCode.Conflict) return null;   // survey not started yet — see StartSurveyAsync
         res.EnsureSuccessStatusCode();
         return (await res.Content.ReadFromJsonAsync<NextQuestionDto>(ct))!;
     }
@@ -67,23 +68,22 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
         res.EnsureSuccessStatusCode();
     }
 
-    public async Task<QuestionDto?> GetFirstActiveQuestionAsync(long tenantId, CancellationToken ct = default)
-    {
-        var msg = new HttpRequestMessage(HttpMethod.Get, "/questions/first-active")
-        {
-            Headers = { { "X-Tenant-Id", tenantId.ToString() } },
-        };
-        using var res = await http.SendAsync(msg, ct);
-        if (res.StatusCode == HttpStatusCode.NotFound) return null;
-        res.EnsureSuccessStatusCode();
-        return await res.Content.ReadFromJsonAsync<QuestionDto>(ct);
-    }
-
     public async Task SetUserLanguageAsync(long tenantId, long telegramUserId, string languageCode, CancellationToken ct = default)
     {
         using var res = await http.SendAsync(
             Build(HttpMethod.Post, $"/users/{telegramUserId}/language", tenantId, new SetLanguageRequest(languageCode)), ct);
         res.EnsureSuccessStatusCode();
+    }
+
+    public async Task<NextQuestionDto> StartSurveyAsync(long tenantId, long telegramUserId, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Post, $"/users/{telegramUserId}/start-survey")
+        {
+            Headers = { { "X-Tenant-Id", tenantId.ToString() } },
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+        return (await res.Content.ReadFromJsonAsync<NextQuestionDto>(ct))!;
     }
 
     public async Task<DashboardSummary> GetDashboardAsync(long tenantId, CancellationToken ct = default)

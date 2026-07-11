@@ -79,13 +79,12 @@ public sealed class SubmitAnswerHandler(
         var application = await applications.GetActiveForUserAsync(cmd.TelegramUserId, ct)
             ?? throw new InvalidOperationException("No active application for this user.");
 
-        // The applicant's first private message starts the survey.
+        // The survey must be explicitly started via StartSurveyHandler (the language-picker's
+        // "lang:go"/"lang:ru"/"lang:en" callbacks) before any answer can be recorded — a stray
+        // message sent instead of tapping a button no longer silently starts it and consumes that
+        // message as the answer to question #1 (see docs/changelog.md 2026-07-11).
         if (application.Status == ApplicationStatus.SurveyOffered)
-        {
-            var firstQ = await questions.GetFirstActiveAsync(ct)
-                ?? throw new InvalidOperationException("No active questions configured.");
-            application.StartSurvey(firstQ.Id, now);
-        }
+            throw new SurveyNotStartedException("Survey has not been started yet — use the language picker first.");
 
         var currentId = application.Session!.CurrentQuestionId
             ?? throw new InvalidOperationException("Survey has no current question.");
@@ -149,5 +148,53 @@ public sealed class SubmitAnswerHandler(
             ? new NextStep(null, null, null, Completed: true, user?.LanguageCode)
             : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false,
                 user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(next.ConfigJson));
+    }
+}
+
+// --- Explicitly start the survey (language-picker "lang:go"/"lang:ru"/"lang:en") -------------
+
+public sealed record StartSurveyCommand(long TelegramUserId);
+
+public sealed class StartSurveyHandler(
+    IApplicationRepository applications,
+    IQuestionRepository questions,
+    IUserRepository users,
+    IUnitOfWork unitOfWork,
+    IClock clock)
+{
+    public async Task<NextStep> HandleAsync(StartSurveyCommand cmd, CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+
+        var application = await applications.GetActiveForUserAsync(cmd.TelegramUserId, ct)
+            ?? throw new InvalidOperationException("No active application for this user.");
+        var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+
+        if (application.Status == ApplicationStatus.SurveyOffered)
+        {
+            var firstQ = await questions.GetFirstActiveAsync(ct)
+                ?? throw new InvalidOperationException("No active questions configured.");
+            application.StartSurvey(firstQ.Id, now);
+            await unitOfWork.SaveChangesAsync(ct);
+            return new NextStep(firstQ.Id, firstQ.PromptText, firstQ.Type.ToString(), Completed: false,
+                user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(firstQ.ConfigJson));
+        }
+
+        // Idempotent re-tap (double-tap "Продолжить", or tapping again after already progressing
+        // via a normal answer) — re-show wherever they currently are rather than erroring via
+        // StartSurvey's own EnsureStatus guard.
+        if (application.Status == ApplicationStatus.InSurvey && application.Session?.CurrentQuestionId is { } currentId)
+        {
+            var current = await questions.GetByIdAsync(currentId, ct);
+            if (current is not null)
+                return new NextStep(current.Id, current.PromptText, current.Type.ToString(), Completed: false,
+                    user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(current.ConfigJson));
+        }
+
+        // Degenerate fallback (InSurvey but no current question, e.g. it was deleted mid-survey) —
+        // GetActiveForUserAsync only ever returns SurveyOffered/InSurvey applications in the first
+        // place, so a stale tap after the survey is already decided already fails earlier, at the
+        // "No active application" guard above, consistent with SubmitAnswerHandler's own behavior.
+        return new NextStep(null, null, null, Completed: true, user?.LanguageCode);
     }
 }
