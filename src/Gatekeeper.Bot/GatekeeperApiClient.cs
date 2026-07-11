@@ -35,6 +35,12 @@ public sealed class GatekeeperApiClient(HttpClient http) : IGatekeeperApiClient
             res.EnsureSuccessStatusCode();
     }
 
+    public async Task CancelApplicationAsync(long tenantId, long applicationId, CancelApplicationRequest request, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Build(HttpMethod.Post, $"/applications/{applicationId}/cancel", tenantId, request), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     public async Task ModerateAsync(long tenantId, long telegramUserId, ModerationRequest request, CancellationToken ct = default)
     {
         using var res = await http.SendAsync(Build(HttpMethod.Post, $"/users/{telegramUserId}/moderation", tenantId, request), ct);

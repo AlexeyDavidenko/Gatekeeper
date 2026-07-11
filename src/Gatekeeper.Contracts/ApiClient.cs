@@ -21,6 +21,8 @@ public sealed record SetLanguageRequest(string LanguageCode);
 public sealed record DecideRequest(
     bool Approve, string? Reason, long ActingUserId, string? ActingUserName, string Source);
 
+public sealed record CancelApplicationRequest(long ActingUserId, string? ActingUserName);
+
 public sealed record ModerationRequest(
     string Action, string? Reason, string? Notes, long ChatId,
     long ActingUserId, string? ActingUserName, string Source, DateTimeOffset? ExpiresAt);
@@ -73,7 +75,7 @@ public sealed record DashboardSummary(
 
 // The bot's own "/status" DM command — a cross-tenant lookup (see the endpoint doc comment), so
 // unlike everything else here it carries no tenant id: the caller doesn't need one to show it.
-public sealed record LatestApplicationStatusDto(string Status, DateTimeOffset? SubmittedAt);
+public sealed record LatestApplicationStatusDto(long TenantId, string Status, DateTimeOffset? SubmittedAt);
 
 // --- Tenant provisioning (control-plane, tenant-agnostic) ---
 
@@ -105,6 +107,8 @@ public interface IGatekeeperApiClient
     // sent instead of tapping a language-picker button, not a real answer. See StartSurveyAsync.
     Task<NextQuestionDto?> SubmitAnswerAsync(long tenantId, SubmitAnswerRequest request, CancellationToken ct = default);
     Task DecideAsync(long tenantId, long applicationId, uint rowVersion, DecideRequest request, CancellationToken ct = default);
+    // Admin-driven mid-survey cancel — bot's "/cancel {id}" — see CancelApplicationHandler.
+    Task CancelApplicationAsync(long tenantId, long applicationId, CancelApplicationRequest request, CancellationToken ct = default);
     Task ModerateAsync(long tenantId, long telegramUserId, ModerationRequest request, CancellationToken ct = default);
     Task HandleAdminCallbackAsync(long tenantId, AdminCallbackRequest request, CancellationToken ct = default);
 

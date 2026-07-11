@@ -158,7 +158,7 @@ public sealed class TelegramUpdateWorker(
             case { Message: { Chat.Type: ChatType.Private, From: { } from, Text: { } text } msg } when CommandOf(text) == "/start":
             {
                 var ru = IsRussian(from.LanguageCode);
-                var reply = router.Resolve(from.Id) is not null
+                var reply = await ResolveApplicantTenantAsync(from.Id, ct) is not null
                     ? (ru ? "У вас уже есть заявка в процессе — просто ответьте на вопрос выше." : "You already have an application in progress — just answer the question above.")
                     : (ru
                         ? "👋 Привет! Чтобы подать заявку, отправьте запрос на вступление в группу — я пришлю анкету сюда, в личные сообщения."
@@ -176,7 +176,7 @@ public sealed class TelegramUpdateWorker(
 
             case { Message: { Chat.Type: ChatType.Private, From: { } from } msg }:
             {
-                if (router.Resolve(from.Id) is not { } tenantId) break;  // no active survey for this user
+                if (await ResolveApplicantTenantAsync(from.Id, ct) is not { } tenantId) break;  // no active survey for this user
                 var next = await api.SubmitAnswerAsync(tenantId, new SubmitAnswerRequest(from.Id, msg.Text), ct);
                 if (next is null)
                 {
@@ -230,12 +230,40 @@ public sealed class TelegramUpdateWorker(
                 break;
             }
 
+            // Declines the join request + notifies the applicant + stops their survey, in one step —
+            // for when an admin wants to reject someone before the survey reaches AwaitingReview
+            // (there's no admin card with buttons to tap yet at that stage). Also the only reliable
+            // way to actually stop a survey after declining via Telegram's own native "manage join
+            // requests" UI — Telegram sends the bot no event at all for that action (a Bot API
+            // limitation), so the app has no way to react unless the decline goes through the bot.
+            // Application ids are visible in /find and /pending's output ("#{id} ...").
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, From: { } from, Text: { } text } msg } when CommandOf(text) == "/cancel":
+            {
+                if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
+                {
+                    string reply;
+                    if (long.TryParse(ArgumentOf(text), out var applicationId))
+                    {
+                        var actingName = $"{from.FirstName} {from.LastName}".Trim();
+                        await api.CancelApplicationAsync(tenantId, applicationId,
+                            new CancelApplicationRequest(from.Id, actingName), ct);
+                        reply = "Заявка отменена.";
+                    }
+                    else
+                    {
+                        reply = "Использование: /cancel <id заявки> (id виден в /find или /pending)";
+                    }
+                    await bot.SendMessage(msg.Chat.Id, reply, cancellationToken: ct);
+                }
+                break;
+            }
+
             // The applicant's own language-picker buttons — resolved via the same in-memory
             // TenantRouter used for DM routing (this is a private chat with the bot, not the admin
             // group, so /internal/tenants/resolve by chat id doesn't apply here).
             case { CallbackQuery: { Message: { } m, Data: { } data } cb } when data.StartsWith("lang:"):
             {
-                if (router.Resolve(cb.From.Id) is { } tenantId)
+                if (await ResolveApplicantTenantAsync(cb.From.Id, ct) is { } tenantId)
                 {
                     var action = data["lang:".Length..];
                     switch (action)
@@ -261,7 +289,7 @@ public sealed class TelegramUpdateWorker(
             // SingleChoice: one tap submits immediately — "sc:{questionId}:{optionIndex}".
             case { CallbackQuery: { Data: { } data } cb } when data.StartsWith("sc:"):
             {
-                if (router.Resolve(cb.From.Id) is { } tenantId)
+                if (await ResolveApplicantTenantAsync(cb.From.Id, ct) is { } tenantId)
                 {
                     var parts = data.Split(':');
                     var index = int.Parse(parts[2]);
@@ -295,7 +323,7 @@ public sealed class TelegramUpdateWorker(
             // server already has the question loaded and resolves them back to labels itself.
             case { CallbackQuery: { Data: { } data } cb } when data.StartsWith("mcdone:"):
             {
-                if (router.Resolve(cb.From.Id) is { } tenantId)
+                if (await ResolveApplicantTenantAsync(cb.From.Id, ct) is { } tenantId)
                 {
                     var parts = data.Split(':');
                     var mask = int.Parse(parts[2]);
@@ -322,6 +350,24 @@ public sealed class TelegramUpdateWorker(
     {
         var next = await api.StartSurveyAsync(tenantId, userId, ct);
         await AdvanceAsync(userId, next, ct);
+    }
+
+    /// <summary>Every applicant-side handler needs to know which tenant a Telegram user's in-progress
+    /// application belongs to. The in-memory TenantRouter answers this instantly in the common case,
+    /// but it can lose the mapping (most likely a bot restart between the join request and the
+    /// applicant eventually responding, given this server's known periodic reboots) — when that
+    /// happens, every handler gated on it would otherwise silently no-op forever, with zero
+    /// user-visible feedback, until the next startup's RehydrateRouterAsync happens to run. Self-heal
+    /// from durable DB state instead via the same cross-tenant lookup "/status" already uses.</summary>
+    private async Task<long?> ResolveApplicantTenantAsync(long telegramUserId, CancellationToken ct)
+    {
+        if (router.Resolve(telegramUserId) is { } tenantId) return tenantId;
+
+        var status = await api.GetLatestApplicationStatusAsync(telegramUserId, ct);
+        if (status is null || status.Status is not ("SurveyOffered" or "InSurvey")) return null;
+
+        router.Remember(telegramUserId, status.TenantId);
+        return status.TenantId;
     }
 
     /// <summary>Completion or next-question dispatch — shared by the free-text and button-tap paths.</summary>

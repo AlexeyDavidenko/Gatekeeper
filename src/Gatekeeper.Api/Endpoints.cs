@@ -90,6 +90,17 @@ public static class ApplicationsEndpoints
             }
         });
 
+        // Admin-driven mid-survey cancel — bot's "/cancel {id}" command. Distinct from /decision:
+        // no admin card exists yet to edit (only sent once the survey reaches AwaitingReview) and no
+        // competing-decision race to guard with a rowVersion, so this is a plain command endpoint,
+        // not routed through /callback (which carries ChatId/MessageId for editing a card).
+        group.MapPost("/{id:long}/cancel", async (
+            long id, CancelApplicationRequest body, CancelApplicationHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new CancelApplicationCommand(id, body.ActingUserId, body.ActingUserName), ct);
+            return Results.NoContent();
+        });
+
         // Create from a join request → returns the welcome + first question.
         group.MapPost("/", async (CreateApplicationRequest body, CreateApplicationHandler handler, CancellationToken ct) =>
         {
@@ -527,6 +538,7 @@ public static class InternalEndpoints
             long telegramUserId, CatalogDbContext catalog, TenantDbContextFactory factory, CancellationToken ct) =>
         {
             Domain.Application? best = null;
+            long bestTenantId = 0;
             var tenants = await catalog.Tenants.AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
             foreach (var tenant in tenants)
             {
@@ -536,11 +548,14 @@ public static class InternalEndpoints
                     .OrderByDescending(a => a.CreatedAt)
                     .FirstOrDefaultAsync(ct);
                 if (candidate is not null && (best is null || candidate.CreatedAt > best.CreatedAt))
+                {
                     best = candidate;
+                    bestTenantId = tenant.Id;
+                }
             }
             return best is null
                 ? Results.NotFound()
-                : Results.Ok(new LatestApplicationStatusDto(best.Status.ToString(), best.SubmittedAt));
+                : Results.Ok(new LatestApplicationStatusDto(bestTenantId, best.Status.ToString(), best.SubmittedAt));
         });
 
         // Outbox drain: scan active tenants, claim Pending commands, hand them to the bot. Before

@@ -106,8 +106,10 @@ public sealed class CrossTenantIntegrationTests(PostgresFixture fixture)
         tenantB.Applications.Add(newerApp);
         await tenantB.SaveChangesAsync();
 
-        // Replicate the exact loop from Endpoints.cs "/internal/applications/by-user/{id}".
+        // Replicate the exact loop from Endpoints.cs "/internal/applications/by-user/{id}", including
+        // the TenantId tracking the self-healing TenantRouter fallback (Workers.cs) now depends on.
         Domain.Application? best = null;
+        long bestTenantId = 0;
         var tenants = await catalog.Tenants.AsNoTracking().Where(t => t.IsActive).ToListAsync();
         foreach (var tenant in tenants)
         {
@@ -117,12 +119,18 @@ public sealed class CrossTenantIntegrationTests(PostgresFixture fixture)
                 .OrderByDescending(a => a.CreatedAt)
                 .FirstOrDefaultAsync();
             if (candidate is not null && (best is null || candidate.CreatedAt > best.CreatedAt))
+            {
                 best = candidate;
+                bestTenantId = tenant.Id;
+            }
         }
 
         Assert.NotNull(best);
         Assert.Equal(newerNow, best.CreatedAt);
         Assert.Equal(ApplicationStatus.SurveyOffered, best.Status);
+
+        var tenantBRow = await catalog.Tenants.AsNoTracking().SingleAsync(t => t.Slug == "tenant-b");
+        Assert.Equal(tenantBRow.Id, bestTenantId);
     }
 
     [Fact]
