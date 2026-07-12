@@ -36,7 +36,6 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
     <PackageVersion Include="xunit" Version="2.7.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.6" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.0" />
     <!-- Spins up real ephemeral Postgres containers for integration tests — postgres:16-alpine
          (~115MB vs ~165MB for the Debian-based tag, matches the prod major version) is pinned in
          PostgresFixture, not here; this just needs the client library. -->
