@@ -21,6 +21,8 @@ public sealed class ModerationAction : AggregateRoot
     public string? TelegramResult { get; private set; }
     public DateTimeOffset? ExpiresAt { get; private set; }   // temp mute/ban
     public DateTimeOffset CreatedAt { get; private set; }
+    public bool IsArchived { get; private set; }
+    public DateTimeOffset? ArchivedAt { get; private set; }
 
     public IReadOnlyCollection<ModerationAttachment> Attachments => _attachments.AsReadOnly();
 
@@ -59,6 +61,20 @@ public sealed class ModerationAction : AggregateRoot
     };
 
     public void SetTelegramResult(string result) => TelegramResult = result;
+
+    // Reversible — an Owner archiving old log entries is a cleanup action, not a correction of
+    // the record itself, so undoing it must be possible (mirrors Question.Activate/Deactivate).
+    public void Archive(DateTimeOffset now)
+    {
+        IsArchived = true;
+        ArchivedAt = now;
+    }
+
+    public void Unarchive()
+    {
+        IsArchived = false;
+        ArchivedAt = null;
+    }
 
     public ModerationAttachment AttachEvidence(
         string storagePath, string contentHash, string contentType, long sizeBytes, long uploadedBy, DateTimeOffset now)

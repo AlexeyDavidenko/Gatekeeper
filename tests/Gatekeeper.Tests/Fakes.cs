@@ -160,4 +160,19 @@ public sealed class FakeModerationRepository : IModerationRepository
                         (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .OrderByDescending(a => a.CreatedAt)
             .FirstOrDefault());
+
+    public Task<ModerationAction?> GetAsync(long id, CancellationToken ct = default) =>
+        Task.FromResult(Store.FirstOrDefault(a => a.Id == id));
+
+    public Task<IReadOnlyList<ModerationAction>> GetActiveOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<ModerationAction>>(
+            Store.Where(a => !a.IsArchived && a.CreatedAt < cutoff).ToList());
+
+    /// <summary>Seeds an action with a specific known id, bypassing AddAsync's auto-increment.</summary>
+    public void Seed(ModerationAction action, long id)
+    {
+        FakeIds.Assign(action, id);
+        Store.Add(action);
+        _nextId = Math.Max(_nextId, id + 1);
+    }
 }

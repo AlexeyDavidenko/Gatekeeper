@@ -49,6 +49,8 @@ builder.Services.AddScoped<CreateApplicationHandler>();
 builder.Services.AddScoped<SubmitAnswerHandler>();
 builder.Services.AddScoped<StartSurveyHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();
+builder.Services.AddScoped<ArchiveModerationActionsHandler>();
+builder.Services.AddScoped<UnarchiveModerationActionHandler>();
 builder.Services.AddScoped<CreateQuestionHandler>();
 builder.Services.AddScoped<EditQuestionHandler>();
 builder.Services.AddScoped<MoveQuestionHandler>();

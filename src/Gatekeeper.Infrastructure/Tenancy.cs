@@ -77,6 +77,12 @@ public sealed class ModerationRepository(TenantDbContext db) : IModerationReposi
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .OrderByDescending(a => a.CreatedAt)
             .FirstOrDefaultAsync(ct);
+
+    public Task<ModerationAction?> GetAsync(long id, CancellationToken ct = default) =>
+        db.ModerationActions.FirstOrDefaultAsync(a => a.Id == id, ct);
+
+    public async Task<IReadOnlyList<ModerationAction>> GetActiveOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct = default) =>
+        await db.ModerationActions.Where(a => !a.IsArchived && a.CreatedAt < cutoff).ToListAsync(ct);
 }
 
 /// <summary>Enqueues into the same DbContext so the command commits with the state change.</summary>

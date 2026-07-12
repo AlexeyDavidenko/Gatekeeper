@@ -37,11 +37,25 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
             ?? new DashboardSummary(0, 0, 0, 0, 0, 0, 0, 0, []);
     }
 
-    public async Task<IReadOnlyList<ModerationLogEntry>> GetAuditLogAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ModerationLogEntry>> GetAuditLogAsync(bool includeArchived = false, CancellationToken ct = default)
     {
-        using var res = await http.SendAsync(Get("/moderation"), ct);
+        using var res = await http.SendAsync(Get($"/moderation?includeArchived={includeArchived}"), ct);
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<List<ModerationLogEntry>>(ct) ?? [];
+    }
+
+    public async Task<int> ArchiveModerationActionsAsync(DateTimeOffset olderThan, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post("/moderation/archive", new ArchiveModerationActionsRequest(olderThan)), ct);
+        res.EnsureSuccessStatusCode();
+        var body = await res.Content.ReadFromJsonAsync<ArchiveModerationActionsResponse>(ct);
+        return body?.ArchivedCount ?? 0;
+    }
+
+    public async Task UnarchiveModerationActionAsync(long id, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post($"/moderation/{id}/unarchive"), ct);
+        res.EnsureSuccessStatusCode();
     }
 
     public async Task RecordVisitAsync(RecordSiteVisitRequest request, CancellationToken ct = default)

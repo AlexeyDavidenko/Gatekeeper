@@ -53,6 +53,9 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
         b.Entity<ModerationAction>(e =>
         {
             e.HasIndex(m => m.TelegramUserId);
+            // Every read of this table (GET /moderation, /dashboard x2, and the archive-by-cutoff
+            // query) filters on IsArchived and orders/filters by CreatedAt — leading-column match.
+            e.HasIndex(m => new { m.IsArchived, m.CreatedAt });
             e.HasMany(m => m.Attachments).WithOne().HasForeignKey(a => a.ModerationActionId);
         });
 

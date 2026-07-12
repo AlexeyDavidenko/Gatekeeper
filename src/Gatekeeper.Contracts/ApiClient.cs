@@ -55,7 +55,11 @@ public sealed record EditQuestionRequest(string Type, string PromptText, bool Is
 public sealed record ModerationLogEntry(
     long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,
     string Action, string? Reason, string? Notes, long PerformedByUserId, string? PerformedByName,
-    string Source, DateTimeOffset CreatedAt);
+    string Source, DateTimeOffset CreatedAt, bool IsArchived, DateTimeOffset? ArchivedAt);
+
+// Owner-triggered bulk cleanup of old moderation-log entries — no automatic/scheduled purge exists.
+public sealed record ArchiveModerationActionsRequest(DateTimeOffset OlderThan);
+public sealed record ArchiveModerationActionsResponse(int ArchivedCount);
 
 // Site visitor log — page views against the admin site itself, not moderation actions.
 public sealed record RecordSiteVisitRequest(

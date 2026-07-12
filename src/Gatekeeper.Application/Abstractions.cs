@@ -78,6 +78,9 @@ public interface IModerationRepository
 {
     Task AddAsync(ModerationAction action, CancellationToken ct = default);
     Task<ModerationAction?> GetLatestDecisionAsync(long applicationId, CancellationToken ct = default);
+    Task<ModerationAction?> GetAsync(long id, CancellationToken ct = default);
+    // Tracked (not AsNoTracking) — callers mutate each result before SaveChangesAsync.
+    Task<IReadOnlyList<ModerationAction>> GetActiveOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct = default);
 }
 
 public interface ISiteVisitRepository

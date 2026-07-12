@@ -369,9 +369,13 @@ public static class ModerationEndpoints
         });
 
         // Audit log for the admin site — gated client-side to the elevated (Owner) role.
-        app.MapGet("/moderation", async (TenantDbContext db, CancellationToken ct) =>
+        // includeArchived defaults to false — archived rows are opt-in only (History.razor's
+        // "показать заархивированные" toggle).
+        app.MapGet("/moderation", async (bool? includeArchived, TenantDbContext db, CancellationToken ct) =>
         {
+            var showArchived = includeArchived ?? false;
             var actions = await db.ModerationActions.AsNoTracking()
+                .Where(a => showArchived || !a.IsArchived)
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(200)
                 .ToListAsync(ct);
@@ -387,10 +391,25 @@ public static class ModerationEndpoints
                 return new ModerationLogEntry(
                     a.Id, a.TelegramUserId, u?.Username, ApplicationsEndpoints.Display(u), a.ApplicationId,
                     a.Action.ToString(), a.Reason, a.Notes, a.PerformedByUserId, a.PerformedByName,
-                    a.Source.ToString(), a.CreatedAt);
+                    a.Source.ToString(), a.CreatedAt, a.IsArchived, a.ArchivedAt);
             }).ToList();
 
             return Results.Ok(result);
+        });
+
+        // Owner-triggered bulk cleanup (History.razor) — no automatic/scheduled purge exists.
+        app.MapPost("/moderation/archive", async (
+            ArchiveModerationActionsRequest body, ArchiveModerationActionsHandler handler, CancellationToken ct) =>
+        {
+            var count = await handler.HandleAsync(new ArchiveModerationActionsCommand(body.OlderThan), ct);
+            return Results.Ok(new ArchiveModerationActionsResponse(count));
+        });
+
+        app.MapPost("/moderation/{id:long}/unarchive", async (
+            long id, UnarchiveModerationActionHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new UnarchiveModerationActionCommand(id), ct);
+            return Results.NoContent();
         });
 
         return app;
@@ -442,7 +461,7 @@ public static class DashboardEndpoints
                 .CountAsync(a => a.Status == ApplicationStatus.AwaitingReview, ct);
 
             var decisions = await db.ModerationActions.AsNoTracking()
-                .Where(a => a.CreatedAt >= weekStart &&
+                .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
                     (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
                 .ToListAsync(ct);
 
@@ -459,7 +478,8 @@ public static class DashboardEndpoints
                 .CountAsync(c => c.Status == TelegramCommandStatus.Failed, ct);
 
             var recent = await db.ModerationActions.AsNoTracking()
-                .Where(a => a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject)
+                .Where(a => !a.IsArchived &&
+                    (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(10)
                 .ToListAsync(ct);
@@ -475,7 +495,7 @@ public static class DashboardEndpoints
                 return new ModerationLogEntry(
                     a.Id, a.TelegramUserId, u?.Username, ApplicationsEndpoints.Display(u), a.ApplicationId,
                     a.Action.ToString(), a.Reason, a.Notes, a.PerformedByUserId, a.PerformedByName,
-                    a.Source.ToString(), a.CreatedAt);
+                    a.Source.ToString(), a.CreatedAt, a.IsArchived, a.ArchivedAt);
             }).ToList();
 
             return Results.Ok(new DashboardSummary(

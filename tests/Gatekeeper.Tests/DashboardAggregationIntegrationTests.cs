@@ -48,7 +48,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         // Execute the exact query from Endpoints.cs /dashboard — two-step pattern
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart &&
+            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
@@ -87,7 +87,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         // Execute the first DB round-trip from Endpoints.cs /dashboard
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart &&
+            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
@@ -129,7 +129,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         // Execute the exact query pattern from Endpoints.cs /dashboard
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart &&
+            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
@@ -139,6 +139,51 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         // Assert: separate counts match what we seeded
         Assert.Equal(2, approvedToday);
         Assert.Equal(3, rejectedToday);
+    }
+
+    [Fact]
+    public async Task Archived_Decisions_Excluded_From_Weekly_Counts_And_Recent_List()
+    {
+        await using var db = await fixture.CreateTenantDbAsync();
+
+        var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
+        var weekStart = todayStart.AddDays(-7);
+
+        var archived = ModerationAction.ForDecision(
+            telegramUserId: 5001, applicationId: 500, chatId: -999,
+            action: ModerationActionType.Approve, reason: "Good application",
+            performedByUserId: 500, performedByName: "Admin1", source: ActionSource.Web,
+            now: todayStart.AddHours(1));
+        archived.Archive(todayStart.AddHours(2));
+
+        var active = ModerationAction.ForDecision(
+            telegramUserId: 5002, applicationId: 501, chatId: -999,
+            action: ModerationActionType.Approve, reason: "Good application",
+            performedByUserId: 500, performedByName: "Admin1", source: ActionSource.Web,
+            now: todayStart.AddHours(1));
+
+        db.ModerationActions.Add(archived);
+        db.ModerationActions.Add(active);
+        await db.SaveChangesAsync();
+
+        // Weekly-count query from Endpoints.cs /dashboard
+        var decisions = await db.ModerationActions.AsNoTracking()
+            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+                (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
+            .ToListAsync();
+
+        // "Recent decisions" query from Endpoints.cs /dashboard
+        var recent = await db.ModerationActions.AsNoTracking()
+            .Where(a => !a.IsArchived &&
+                (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        Assert.Single(decisions);
+        Assert.Equal(active.Id, decisions[0].Id);
+        Assert.Single(recent);
+        Assert.Equal(active.Id, recent[0].Id);
     }
 
     [Fact]

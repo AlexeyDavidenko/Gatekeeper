@@ -41,3 +41,32 @@ public sealed class ModerateUserHandler(
         await unitOfWork.SaveChangesAsync(ct);
     }
 }
+
+public sealed record ArchiveModerationActionsCommand(DateTimeOffset OlderThan);
+
+/// <summary>Owner-triggered bulk cleanup — no automatic/scheduled purge exists, this is the only
+/// way old ModerationAction rows ever get archived. Reversible per-row via UnarchiveModerationActionHandler.</summary>
+public sealed class ArchiveModerationActionsHandler(IModerationRepository moderation, IUnitOfWork unitOfWork, IClock clock)
+{
+    public async Task<int> HandleAsync(ArchiveModerationActionsCommand cmd, CancellationToken ct = default)
+    {
+        var stale = await moderation.GetActiveOlderThanAsync(cmd.OlderThan, ct);
+        var now = clock.UtcNow;
+        foreach (var action in stale) action.Archive(now);
+        await unitOfWork.SaveChangesAsync(ct);
+        return stale.Count;
+    }
+}
+
+public sealed record UnarchiveModerationActionCommand(long ModerationActionId);
+
+public sealed class UnarchiveModerationActionHandler(IModerationRepository moderation, IUnitOfWork unitOfWork)
+{
+    public async Task HandleAsync(UnarchiveModerationActionCommand cmd, CancellationToken ct = default)
+    {
+        var action = await moderation.GetAsync(cmd.ModerationActionId, ct)
+            ?? throw new InvalidOperationException($"ModerationAction {cmd.ModerationActionId} not found.");
+        action.Unarchive();
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+}

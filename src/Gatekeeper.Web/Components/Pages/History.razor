@@ -1,6 +1,7 @@
 @page "/history"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject NavigationManager Nav
 
 <h1>История решений</h1>
 
@@ -44,23 +45,101 @@ else
     </MudTable>
 }
 
+<AuthorizeView Context="archiveContext" Roles="Owner">
+    <Authorized>
+        <h2>Архив журнала модерации</h2>
+        <form method="post" action="history/archive" class="inline">
+            <AntiforgeryToken />
+            <label>Архивировать записи журнала старше:
+                <input type="date" name="olderThan" required />
+            </label>
+            <button type="submit" class="approve">Архивировать</button>
+        </form>
+        @if (Archived is not null)
+        {
+            <p class="muted">Заархивировано записей: @Archived</p>
+        }
+
+        @if (IncludeArchived)
+        {
+            <a href="/history">Скрыть заархивированные</a>
+        }
+        else
+        {
+            <a href="/history?includeArchived=true">Показать заархивированные</a>
+        }
+
+        @if (IncludeArchived)
+        {
+            @if (_archived.Count == 0)
+            {
+                <p class="muted">Архив пуст.</p>
+            }
+            else
+            {
+                <MudTable Items="_archived" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Когда</MudTh>
+                        <MudTh>Действие</MudTh>
+                        <MudTh>Заявка</MudTh>
+                        <MudTh>Кем</MudTh>
+                        <MudTh>Заархивировано</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
+                        <MudTd DataLabel="Действие">@context.Action</MudTd>
+                        <MudTd DataLabel="Заявка">@(context.ApplicationId?.ToString() ?? "—")</MudTd>
+                        <MudTd DataLabel="Кем">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
+                        <MudTd DataLabel="Заархивировано"><LocalTime Value="context.ArchivedAt" /></MudTd>
+                        <MudTd>
+                            <form method="post" action="history/@context.Id/unarchive" class="inline">
+                                <AntiforgeryToken /><button type="submit" class="link">Восстановить</button>
+                            </form>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        }
+    </Authorized>
+</AuthorizeView>
+
 @code {
+    private bool IncludeArchived;
+    private int? Archived;
+
     private IReadOnlyList<ApplicationSummary>? _apps;
     private Dictionary<long, ModerationLogEntry> _decisions = [];
+    private IReadOnlyList<ModerationLogEntry> _archived = [];
 
     protected override async Task OnInitializedAsync()
     {
+        // Same manual query-string read as Login.razor's "?error=" — this app has no
+        // [SupplyParameterFromQuery] precedent, keep the one established pattern.
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+        IncludeArchived = query.TryGetValue("includeArchived", out var ia) && ia == "true";
+        if (query.TryGetValue("archived", out var a) && int.TryParse(a, out var archivedCount))
+            Archived = archivedCount;
+
         var approved = await Api.GetByStatusAsync("Approved");
         var rejected = await Api.GetByStatusAsync("Rejected");
         _apps = approved.Concat(rejected).OrderByDescending(a => a.SubmittedAt).ToList();
 
         // "Кем"/"Откуда" — same audit-log data as /audit, just joined onto each application by id
         // (only Owners see these two columns; the fetch itself is harmless either way since
-        // AuthorizeView suppresses rendering server-side for anyone else).
+        // AuthorizeView suppresses rendering server-side for anyone else). Archived decisions stay
+        // out of this join on purpose — archiving hides "internal kitchen" audit detail, not the
+        // application itself, which the main table above always shows regardless.
         var log = await Api.GetAuditLogAsync();
         _decisions = log
             .Where(e => e.ApplicationId is not null && e.Action is "Approve" or "Reject")
             .GroupBy(e => e.ApplicationId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).First());
+
+        if (IncludeArchived)
+        {
+            var full = await Api.GetAuditLogAsync(includeArchived: true);
+            _archived = full.Where(e => e.IsArchived).OrderByDescending(e => e.ArchivedAt).ToList();
+        }
     }
 }

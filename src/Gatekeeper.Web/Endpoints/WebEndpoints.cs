@@ -113,6 +113,25 @@ public static class WebEndpoints
             return Results.Redirect("/questions");
         });
 
+        // Moderation-log archiving form posts (History.razor, Owner-only control) — same
+        // auth/antiforgery shape as decisions/questions above.
+        var history = app.MapGroup("/history").RequireAuthorization();
+        history.MapPost("/archive", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            var form = await ctx.Request.ReadFormAsync(ct);
+            if (!DateTimeOffset.TryParse(form["olderThan"], out var olderThan))
+                return Results.Redirect("/history?includeArchived=true");
+            var count = await api.ArchiveModerationActionsAsync(olderThan, ct);
+            return Results.Redirect($"/history?includeArchived=true&archived={count}");
+        });
+        history.MapPost("/{id:long}/unarchive", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            await api.UnarchiveModerationActionAsync(id, ct);
+            return Results.Redirect("/history?includeArchived=true");
+        });
+
         return app;
     }
 
