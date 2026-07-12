@@ -27,6 +27,9 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <!-- Evidence-attachment file storage (screenshots for moderation actions) — files live here,
+         only the path + SHA-256 hash go in Postgres. -->
+    <PackageVersion Include="Minio" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup Label="Transitive security pins">
     <!-- Overrides the vulnerable 9.0.0 pulled transitively via EF Core Design / Roslyn workspaces (NU1903). -->
@@ -40,5 +43,8 @@
          (~115MB vs ~165MB for the Debian-based tag, matches the prod major version) is pinned in
          PostgresFixture, not here; this just needs the client library. -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.10.0" />
+    <!-- Same family, same pinned major/minor as Testcontainers.PostgreSql above — real MinIO
+         container for MinioEvidenceStorage integration tests. -->
+    <PackageVersion Include="Testcontainers.Minio" Version="3.10.0" />
   </ItemGroup>
 </Project>

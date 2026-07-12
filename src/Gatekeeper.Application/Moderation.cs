@@ -14,7 +14,9 @@ public sealed class ModerateUserHandler(
     IUnitOfWork unitOfWork,
     IClock clock)
 {
-    public async Task HandleAsync(ModerateUserCommand cmd, CancellationToken ct = default)
+    // Returns the new ModerationAction's id — callers (e.g. the evidence-upload flow) need it to
+    // attach a screenshot to the action that was just created.
+    public async Task<long> HandleAsync(ModerateUserCommand cmd, CancellationToken ct = default)
     {
         var now = clock.UtcNow;
 
@@ -37,6 +39,28 @@ public sealed class ModerateUserHandler(
             queue.Enqueue(TelegramCommand.Enqueue(commandType, JsonSerializer.Serialize(payload),
                 applicationId: null, telegramUserId: cmd.TelegramUserId, now));
         }
+
+        await unitOfWork.SaveChangesAsync(ct);
+        return action.Id;
+    }
+}
+
+public sealed record AttachEvidenceCommand(long ModerationActionId, Stream Content, string ContentType, long ActingUserId);
+
+/// <summary>Deliberately independent of ModerateUserHandler — creating an action and attaching
+/// evidence to it are separate operations, so evidence can be retried or attached later without
+/// re-doing the action itself, and (not wired up yet) could equally attach to an approve/reject
+/// decision in the future without any changes here.</summary>
+public sealed class AttachEvidenceHandler(
+    IModerationRepository moderation, IEvidenceStorage storage, IUnitOfWork unitOfWork, IClock clock)
+{
+    public async Task HandleAsync(AttachEvidenceCommand cmd, CancellationToken ct = default)
+    {
+        var action = await moderation.GetAsync(cmd.ModerationActionId, ct)
+            ?? throw new InvalidOperationException($"ModerationAction {cmd.ModerationActionId} not found.");
+
+        var (storagePath, hash, sizeBytes) = await storage.SaveAsync(cmd.Content, cmd.ContentType, ct);
+        action.AttachEvidence(storagePath, hash, cmd.ContentType, sizeBytes, cmd.ActingUserId, clock.UtcNow);
 
         await unitOfWork.SaveChangesAsync(ct);
     }

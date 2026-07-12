@@ -253,7 +253,7 @@ public static class ApplicationsEndpoints
                 .Select(x => new AnswerDto(x.PromptSnapshot, x.TypeSnapshot.ToString(), x.PositionSnapshot, x.Text))
                 .ToList();
 
-            return Results.Ok(new ApplicationCard(a.Id, a.TelegramUserId, u?.Username, Display(u),
+            return Results.Ok(new ApplicationCard(a.Id, a.TelegramUserId, a.MainChatId, u?.Username, Display(u),
                 a.Status.ToString(), a.CreatedAt, a.SubmittedAt, a.RowVersion, answers, u?.Bio, u?.PhotoFileId));
         });
 
@@ -362,10 +362,43 @@ public static class ModerationEndpoints
             if (!Enum.TryParse<ActionSource>(body.Source, ignoreCase: true, out var source))
                 return Results.BadRequest("Invalid source.");
 
-            await handler.HandleAsync(new ModerateUserCommand(
+            var id = await handler.HandleAsync(new ModerateUserCommand(
                 telegramUserId, body.ChatId, action, body.Reason, body.Notes,
                 body.ActingUserId, body.ActingUserName, source, body.ExpiresAt), ct);
+            return Results.Ok(new ModerateResponse(id));
+        });
+
+        // Evidence upload — deliberately separate from the moderation action itself (see
+        // AttachEvidenceHandler's doc comment). multipart/form-data: "evidence" file part +
+        // "actingUserId" field, same manual IFormCollection style WebEndpoints.cs already uses
+        // for form posts, rather than introducing [FromForm] attribute binding as a second style.
+        app.MapPost("/moderation/{id:long}/evidence", async (
+            long id, HttpContext ctx, AttachEvidenceHandler handler, CancellationToken ct) =>
+        {
+            var form = await ctx.Request.ReadFormAsync(ct);
+            var file = form.Files["evidence"];
+            if (file is null || file.Length == 0)
+                return Results.BadRequest("Missing evidence file.");
+            if (!long.TryParse(form["actingUserId"], out var actingUserId))
+                return Results.BadRequest("Missing actingUserId.");
+
+            await using var stream = file.OpenReadStream();
+            await handler.HandleAsync(new AttachEvidenceCommand(id, stream, file.ContentType, actingUserId), ct);
             return Results.NoContent();
+        });
+
+        // Streams an evidence file back out — e.g. so an admin can view what they just uploaded.
+        app.MapGet("/moderation-attachments/{attachmentId:long}", async (
+            long attachmentId, TenantDbContext db, IEvidenceStorage storage, CancellationToken ct) =>
+        {
+            var attachment = await db.ModerationAttachments.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == attachmentId, ct);
+            if (attachment is null) return Results.NotFound();
+
+            var stream = await storage.OpenReadAsync(attachment.StoragePath, ct);
+            if (stream is null) return Results.NotFound();
+
+            return Results.Stream(stream, attachment.ContentType);
         });
 
         // Audit log for the admin site — gated client-side to the elevated (Owner) role.

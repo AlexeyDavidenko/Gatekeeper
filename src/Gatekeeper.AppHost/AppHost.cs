@@ -15,6 +15,8 @@ var botUsername = builder.AddParameter("telegram-bot-username", secret: false);
 var adminChatId = builder.AddParameter("telegram-admin-chat-id", secret: false);
 var tenantId = builder.AddParameter("tenant-id", secret: false);
 var tunnelToken = builder.AddParameter("cloudflare-tunnel-token", secret: true);
+var minioRootUser = builder.AddParameter("minio-root-user", secret: false);
+var minioRootPassword = builder.AddParameter("minio-root-password", secret: true);
 
 // Only the Postgres server + Catalog DB are modeled here — tenant DBs are provisioned at runtime
 // (see runbook.md), so they don't have a fixed place in this topology.
@@ -39,11 +41,27 @@ var postgres = builder.AddPostgres("postgres")
 
 var catalogDb = postgres.AddDatabase("catalog");
 
+// Screenshot-evidence storage for moderation actions (Ban/Mute/Kick/Warn) — file lives here, only
+// the path + SHA-256 hash go in Postgres. Console (9001) isn't tunneled/published anywhere; only
+// the S3 API port (9000) needs to be reachable, and only by api, over the private compose network.
+var minio = builder.AddContainer("minio", "minio/minio")
+    .WithArgs("server", "/data", "--console-address", ":9001")
+    .WithEnvironment("MINIO_ROOT_USER", minioRootUser)
+    .WithEnvironment("MINIO_ROOT_PASSWORD", minioRootPassword)
+    .WithVolume("minio-data", "/data")
+    .WithLifetime(ContainerLifetime.Persistent)
+    .PublishAsDockerComposeService((_, service) => service.Restart = "unless-stopped");
+
 var api = builder.AddProject<Projects.Gatekeeper_Api>("api")
     .WithReference(catalogDb)
     .WaitFor(catalogDb)
+    .WaitFor(minio)
     .WithEnvironment("Postgres__Server", postgres.Resource.ConnectionStringExpression)
     .WithEnvironment("Internal__ApiKey", internalApiKey)
+    .WithEnvironment("Minio__Endpoint", "minio:9000")
+    .WithEnvironment("Minio__AccessKey", minioRootUser)
+    .WithEnvironment("Minio__SecretKey", minioRootPassword)
+    .WithEnvironment("Minio__Bucket", "evidence")
     .PublishAsDockerComposeService((_, service) =>
     {
         service.Restart = "unless-stopped";

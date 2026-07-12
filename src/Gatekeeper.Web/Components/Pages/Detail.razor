@@ -51,6 +51,24 @@ else
     {
         <p class="muted">Решение уже принято.</p>
     }
+
+    <div class="moderation">
+        <h2>Модерация пользователя</h2>
+        <form method="post" action="applications/@_card.Id/moderate" enctype="multipart/form-data">
+            <AntiforgeryToken />
+            <input type="hidden" name="telegramUserId" value="@_card.TelegramUserId" />
+            <input type="hidden" name="chatId" value="@_card.ChatId" />
+            <select name="action">
+                <option value="Ban">Забанить</option>
+                <option value="Mute">Заглушить</option>
+                <option value="Kick">Кикнуть</option>
+                <option value="Warn">Предупредить</option>
+            </select>
+            <input type="text" name="reason" placeholder="Причина (необязательно)" />
+            <input type="file" name="evidence" accept="image/*" />
+            <button type="submit" class="reject">Применить</button>
+        </form>
+    </div>
 }
 
 @code {

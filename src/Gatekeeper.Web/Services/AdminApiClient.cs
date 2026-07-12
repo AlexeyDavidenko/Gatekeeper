@@ -1,6 +1,7 @@
 namespace Gatekeeper.Web.Services;
 
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Gatekeeper.Contracts;
 
@@ -137,6 +138,34 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
             HttpStatusCode.Conflict => DecisionOutcome.AlreadyDecided,  // Telegram-side already decided
             _ => throw new HttpRequestException($"Decision failed: {(int)res.StatusCode}"),
         };
+    }
+
+    public async Task<long> ModerateAsync(long telegramUserId, ModerationRequest request, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post($"/users/{telegramUserId}/moderation", request), ct);
+        res.EnsureSuccessStatusCode();
+        return (await res.Content.ReadFromJsonAsync<ModerateResponse>(ct))!.Id;
+    }
+
+    // Deliberately separate from ModerateAsync — see AttachEvidenceHandler's doc comment. First
+    // multipart upload in this codebase (everything else is JSON or plain form fields).
+    public async Task AttachEvidenceAsync(
+        long moderationActionId, Stream fileStream, string contentType, string fileName, long actingUserId,
+        CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        using var fileContent = new StreamContent(fileStream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "evidence", fileName);
+        content.Add(new StringContent(actingUserId.ToString()), "actingUserId");
+
+        var msg = new HttpRequestMessage(HttpMethod.Post, $"/moderation/{moderationActionId}/evidence")
+        {
+            Headers = { { "X-Tenant-Id", TenantId.ToString() } },
+            Content = content,
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
     }
 
     private HttpRequestMessage Get(string path) =>

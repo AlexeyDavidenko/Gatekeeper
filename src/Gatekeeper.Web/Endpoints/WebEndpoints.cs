@@ -1,6 +1,7 @@
 namespace Gatekeeper.Web.Endpoints;
 
 using System.Security.Claims;
+using Gatekeeper.Contracts;
 using Gatekeeper.Web.Auth;
 using Gatekeeper.Web.Services;
 using Microsoft.AspNetCore.Antiforgery;
@@ -75,6 +76,31 @@ public static class WebEndpoints
             => DecideAsync(id, approve: true, ctx, api, af, ct));
         apps.MapPost("/{id:long}/reject", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
             => DecideAsync(id, approve: false, ctx, api, af, ct));
+
+        // Ban/Mute/Kick/Warn — separate from approve/reject above, acts on the Telegram user, not
+        // the application. Evidence upload (optional) is a second call, only if a file was chosen —
+        // see AttachEvidenceHandler's doc comment for why creating the action and attaching
+        // evidence are deliberately independent operations.
+        apps.MapPost("/{id:long}/moderate", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
+        {
+            await ValidateAsync(af, ctx);
+            var form = await ctx.Request.ReadFormAsync(ct);
+            if (!long.TryParse(form["telegramUserId"], out var telegramUserId) || !long.TryParse(form["chatId"], out var chatId))
+                return Results.BadRequest("Missing telegramUserId/chatId.");
+
+            var (actingUserId, actingUserName) = CurrentUser(ctx);
+            var actionId = await api.ModerateAsync(telegramUserId, new ModerationRequest(
+                form["action"].ToString(), form["reason"], null, chatId, actingUserId, actingUserName, "Web", null), ct);
+
+            var evidence = form.Files["evidence"];
+            if (evidence is { Length: > 0 })
+            {
+                await using var stream = evidence.OpenReadStream();
+                await api.AttachEvidenceAsync(actionId, stream, evidence.ContentType, evidence.FileName, actingUserId, ct);
+            }
+
+            return Results.Redirect($"applications/{id}");
+        });
 
         // Question management form posts — same auth/antiforgery shape as decisions above.
         // NB: these must NOT share a URL with a @page route (Razor component endpoints match

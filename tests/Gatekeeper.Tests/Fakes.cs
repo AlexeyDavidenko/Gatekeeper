@@ -176,3 +176,23 @@ public sealed class FakeModerationRepository : IModerationRepository
         _nextId = Math.Max(_nextId, id + 1);
     }
 }
+
+public sealed class FakeEvidenceStorage : IEvidenceStorage
+{
+    public List<(string StoragePath, string ContentType, long SizeBytes)> Saved { get; } = [];
+
+    public Task<(string StoragePath, string ContentHash, long SizeBytes)> SaveAsync(
+        Stream content, string contentType, CancellationToken ct = default)
+    {
+        using var buffer = new MemoryStream();
+        content.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+        var path = $"evidence/{hash}";
+        Saved.Add((path, contentType, bytes.LongLength));
+        return Task.FromResult((path, hash, bytes.LongLength));
+    }
+
+    public Task<Stream?> OpenReadAsync(string storagePath, CancellationToken ct = default) =>
+        Task.FromResult<Stream?>(Saved.Any(s => s.StoragePath == storagePath) ? new MemoryStream() : null);
+}

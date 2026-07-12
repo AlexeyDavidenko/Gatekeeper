@@ -83,6 +83,15 @@ public interface IModerationRepository
     Task<IReadOnlyList<ModerationAction>> GetActiveOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct = default);
 }
 
+/// <summary>Evidence-attachment file storage (screenshots for moderation actions) — the blob lives
+/// here, never in Postgres; only StoragePath + ContentHash are persisted on ModerationAttachment.</summary>
+public interface IEvidenceStorage
+{
+    Task<(string StoragePath, string ContentHash, long SizeBytes)> SaveAsync(
+        Stream content, string contentType, CancellationToken ct = default);
+    Task<Stream?> OpenReadAsync(string storagePath, CancellationToken ct = default);
+}
+
 public interface ISiteVisitRepository
 {
     Task AddAsync(SiteVisit visit, CancellationToken ct = default);

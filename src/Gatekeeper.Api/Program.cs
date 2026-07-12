@@ -5,6 +5,7 @@ using Gatekeeper.Application.Tenants;
 using Gatekeeper.Infrastructure;
 using Gatekeeper.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
+using Minio;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,17 @@ builder.Services.AddScoped<StartSurveyHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();
 builder.Services.AddScoped<ArchiveModerationActionsHandler>();
 builder.Services.AddScoped<UnarchiveModerationActionHandler>();
+builder.Services.AddScoped<AttachEvidenceHandler>();
+
+// Evidence-attachment storage — see MinioEvidenceStorage. Singleton: the client/bucket-name pair
+// carries no per-request state.
+builder.Services.AddSingleton<IMinioClient>(_ => new MinioClient()
+    .WithEndpoint(builder.Configuration["Minio:Endpoint"] ?? "minio:9000")
+    .WithCredentials(builder.Configuration["Minio:AccessKey"], builder.Configuration["Minio:SecretKey"])
+    .WithSSL(false)   // Docker-internal-network-only traffic, never leaves the compose network
+    .Build());
+builder.Services.AddSingleton<IEvidenceStorage>(sp => new MinioEvidenceStorage(
+    sp.GetRequiredService<IMinioClient>(), builder.Configuration["Minio:Bucket"] ?? "evidence"));
 builder.Services.AddScoped<CreateQuestionHandler>();
 builder.Services.AddScoped<EditQuestionHandler>();
 builder.Services.AddScoped<MoveQuestionHandler>();

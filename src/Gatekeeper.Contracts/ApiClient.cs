@@ -27,6 +27,10 @@ public sealed record ModerationRequest(
     string Action, string? Reason, string? Notes, long ChatId,
     long ActingUserId, string? ActingUserName, string Source, DateTimeOffset? ExpiresAt);
 
+// Returned so a follow-up evidence upload (multipart, see Web's AttachEvidenceAsync) knows which
+// ModerationAction to attach to — creating the action and attaching evidence are separate steps.
+public sealed record ModerateResponse(long Id);
+
 public sealed record AdminCallbackRequest(
     long AdminChatId, long MessageId, long ActingUserId, string? ActingUserName, string Data);
 
@@ -37,7 +41,7 @@ public sealed record ApplicationSummary(
     string Status, DateTimeOffset? SubmittedAt, string? PhotoFileId);
 
 public sealed record ApplicationCard(
-    long Id, long TelegramUserId, string? Username, string? DisplayName,
+    long Id, long TelegramUserId, long ChatId, string? Username, string? DisplayName,
     string Status, DateTimeOffset CreatedAt, DateTimeOffset? SubmittedAt,
     uint RowVersion, IReadOnlyList<AnswerDto> Answers, string? Bio, string? PhotoFileId);
 
@@ -113,7 +117,8 @@ public interface IGatekeeperApiClient
     Task DecideAsync(long tenantId, long applicationId, uint rowVersion, DecideRequest request, CancellationToken ct = default);
     // Admin-driven mid-survey cancel — bot's "/cancel {id}" — see CancelApplicationHandler.
     Task CancelApplicationAsync(long tenantId, long applicationId, CancelApplicationRequest request, CancellationToken ct = default);
-    Task ModerateAsync(long tenantId, long telegramUserId, ModerationRequest request, CancellationToken ct = default);
+    // Returns the new ModerationAction's id — see ModerateResponse.
+    Task<long> ModerateAsync(long tenantId, long telegramUserId, ModerationRequest request, CancellationToken ct = default);
     Task HandleAdminCallbackAsync(long tenantId, AdminCallbackRequest request, CancellationToken ct = default);
 
     Task<(long TenantId, string Role)?> ResolveTenantByChatAsync(long chatId, CancellationToken ct = default);
