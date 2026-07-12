@@ -19,11 +19,14 @@
     private string? Error;
 
     // BotUsername comes from our own config, not user input — safe to inject as markup.
-    // Self-hosted, patched copy of the widget script (routes OAuth through /tg-oauth) instead of
-    // loading directly from telegram.org — RU ISPs block that domain for browsers. Revert this
-    // one src attribute to "https://telegram.org/js/telegram-widget.js?22" to fully roll back.
+    // TEMPORARILY REVERTED to the direct telegram.org script (2026-07-12): the /tg-oauth path-
+    // prefix proxy broke login for everyone, not just RU users — Telegram's own /embed/{bot} HTML
+    // contains absolute-path links (e.g. "/auth?bot_id=...") that assume root-mounted hosting;
+    // proxied under a path prefix, those resolve against OUR domain root instead of /tg-oauth and
+    // 404. Fixing this properly needs a root-mounted (subdomain) proxy, not a path prefix — see
+    // docs/changelog.md 2026-07-12 for the incident and docs/todo.md for the follow-up plan.
     private string WidgetHtml =>
-        $"""<script async src="/lib/telegram/telegram-widget.js" data-telegram-login="{Config["Telegram:BotUsername"]}" data-size="large" data-auth-url="/auth/telegram" data-request-access="write"></script>""";
+        $"""<script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="{Config["Telegram:BotUsername"]}" data-size="large" data-auth-url="/auth/telegram" data-request-access="write"></script>""";
 
     protected override void OnInitialized()
     {
