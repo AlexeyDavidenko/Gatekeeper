@@ -100,10 +100,11 @@
             /* MudBlazor ships mud-grid-item-{sm,md}-* as plain, unconditional classes (no media
                query of its own — the breakpoint is normally resolved by its own JS resize
                listener) — this is a plain CSS fallback that forces full-width stacking below the
-               same breakpoint the rest of this file already uses, and an unwrapped nav so it
-               doesn't overflow the viewport like the old plain-CSS .topbar never did either. */
+               same breakpoint the rest of this file already uses. Nav links moved out of the app
+               bar into MudDrawer (see MainLayout.razor) — the app bar itself no longer needs a
+               wrap hack, it now only ever holds the hamburger/brand/lang-switch/user, which always
+               fits on one line. */
             .mud-grid-item-sm-6, .mud-grid-item-md-3 { max-width: 100%; flex-basis: 100%; }
-            .mud-appbar { flex-wrap: wrap; height: auto; }
         }
     </style>
     <HeadOutlet />

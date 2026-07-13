@@ -1,36 +1,38 @@
-@* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Options are
-   posted back as repeated "options"/"optionsEn" form fields (add/remove rows handled client-side by
-   wwwroot/js/questionoptions.js, a plain form post — not rewritten to a direct C# call, see
-   docs/backlog.md on the MudBlazor migration for why). Captcha isn't offered — no rendering or
-   answer-parsing exists for it yet. *@
+@* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Add/remove
+   rows and the type-select's show/hide toggle are handled client-side by
+   wwwroot/js/questionoptions.js — the type value and option rows are collected explicitly via
+   CollectAsync() right before saving (QuestionDialog.razor), since there's no native <form> POST
+   here to serialize them. Captcha isn't offered — no rendering or answer-parsing exists for it yet. *@
 @inject IJSRuntime JS
 @inject Translator T
 
-<label>@T["web.qtype.label"]:
-    <select name="type" class="q-type-select" @ref="_select">
-        <option value="Text" selected="@(Type == "Text")">@T["web.qtype.text"]</option>
-        <option value="SingleChoice" selected="@(Type == "SingleChoice")">@T["web.qtype.single_choice"]</option>
-        <option value="MultiChoice" selected="@(Type == "MultiChoice")">@T["web.qtype.multi_choice"]</option>
-    </select>
-</label>
-<div class="q-options" hidden="@(Type is not ("SingleChoice" or "MultiChoice"))">
-    <p class="muted">@T["web.qtype.options_label"]</p>
-    <div class="q-options-list">
-        @if (Options is not null)
-        {
-            @for (var i = 0; i < Options.Count; i++)
+<div @ref="_container">
+    <label>@T["web.qtype.label"]:
+        <select class="q-type-select">
+            <option value="Text" selected="@(Type == "Text")">@T["web.qtype.text"]</option>
+            <option value="SingleChoice" selected="@(Type == "SingleChoice")">@T["web.qtype.single_choice"]</option>
+            <option value="MultiChoice" selected="@(Type == "MultiChoice")">@T["web.qtype.multi_choice"]</option>
+        </select>
+    </label>
+    <div class="q-options" hidden="@(Type is not ("SingleChoice" or "MultiChoice"))">
+        <p class="muted">@T["web.qtype.options_label"]</p>
+        <div class="q-options-list">
+            @if (Options is not null)
             {
-                var opt = Options[i];
-                var optEn = OptionsEn is not null && i < OptionsEn.Count ? OptionsEn[i] : null;
-                <div class="q-option-row">
-                    <input type="text" name="options" value="@opt" />
-                    <input type="text" name="optionsEn" value="@optEn" placeholder="EN" />
-                    <button type="button" class="link q-remove-option">✕</button>
-                </div>
+                @for (var i = 0; i < Options.Count; i++)
+                {
+                    var opt = Options[i];
+                    var optEn = OptionsEn is not null && i < OptionsEn.Count ? OptionsEn[i] : null;
+                    <div class="q-option-row">
+                        <input type="text" name="options" value="@opt" />
+                        <input type="text" name="optionsEn" value="@optEn" placeholder="EN" />
+                        <button type="button" class="link q-remove-option">✕</button>
+                    </div>
+                }
             }
-        }
+        </div>
+        <button type="button" class="link q-add-option">@T["web.qtype.add_option"]</button>
     </div>
-    <button type="button" class="link q-add-option">@T["web.qtype.add_option"]</button>
 </div>
 
 @code {
@@ -38,7 +40,9 @@
     [Parameter] public IReadOnlyList<string>? Options { get; set; }
     [Parameter] public IReadOnlyList<string>? OptionsEn { get; set; }
 
-    private ElementReference _select;
+    private ElementReference _container;
+
+    private sealed record CollectResult(string Type, IReadOnlyList<string> Options, IReadOnlyList<string> OptionsEn);
 
     // Driven by this component's own render lifecycle, not a document-level DOMContentLoaded/
     // enhancedload listener — see the comment in LocalTime.razor for why (navigation happens over
@@ -46,6 +50,20 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-            await JS.InvokeVoidAsync("gatekeeperQuestionOptions.init", _select);
+            await JS.InvokeVoidAsync("gatekeeperQuestionOptions.init", _container);
+    }
+
+    /// <summary>Reads the currently-selected type plus every RU/EN option-row value straight from
+    /// the DOM (the only place they live — this component tracks none of it in Blazor state).
+    /// Blank rows on both sides are dropped; a row with a RU value but blank EN keeps its RU value
+    /// and an empty EN string (Question.OptionsFor's all-or-nothing count check does the rest).</summary>
+    public async Task<(string Type, IReadOnlyList<string>? Options, IReadOnlyList<string>? OptionsEn)> CollectAsync()
+    {
+        var result = await JS.InvokeAsync<CollectResult>("gatekeeperQuestionOptions.collect", _container);
+        if (result.Type is not ("SingleChoice" or "MultiChoice")) return (result.Type, null, null);
+
+        var options = result.Options.Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
+        var optionsEn = result.OptionsEn.Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
+        return (result.Type, options.Count > 0 ? options : null, optionsEn.Count > 0 ? optionsEn : null);
     }
 }

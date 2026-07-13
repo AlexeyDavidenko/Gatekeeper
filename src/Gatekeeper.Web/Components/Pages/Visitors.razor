@@ -15,34 +15,41 @@ else if (_visits.Count == 0)
 }
 else
 {
-    <MudTable Items="_visits" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>@WhenLabel</MudTh>
-            <MudTh>@UserLabel</MudTh>
-            <MudTh>@IpLabel</MudTh>
-            <MudTh>@PathLabel</MudTh>
-            <MudTh>@MethodLabel</MudTh>
-            <MudTh>@StatusLabel</MudTh>
-            <MudTh>@MsLabel</MudTh>
-            <MudTh>@ReferrerLabel</MudTh>
-            <MudTh>User-Agent</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="@WhenLabel"><LocalTime Value="context.CreatedAt" /></MudTd>
-            <MudTd DataLabel="@UserLabel">@(context.UserName ?? (context.UserId?.ToString() ?? T["common.empty_dash"]))</MudTd>
-            <MudTd DataLabel="@IpLabel">@(context.IpAddress ?? T["common.empty_dash"])</MudTd>
-            <MudTd DataLabel="@PathLabel">@context.Path</MudTd>
-            <MudTd DataLabel="@MethodLabel">@context.Method</MudTd>
-            <MudTd DataLabel="@StatusLabel">@context.StatusCode</MudTd>
-            <MudTd DataLabel="@MsLabel">@context.DurationMs</MudTd>
-            <MudTd DataLabel="@ReferrerLabel"><span class="truncate" title="@context.Referrer">@(context.Referrer ?? T["common.empty_dash"])</span></MudTd>
-            <MudTd DataLabel="User-Agent"><span class="truncate" title="@context.UserAgent">@(context.UserAgent ?? T["common.empty_dash"])</span></MudTd>
-        </RowTemplate>
-    </MudTable>
+    <MudTextField T="string" Value="_searchString" ValueChanged="@((string v) => _searchString = v)"
+                  Placeholder="@T["web.common.search"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Class="mb-2" />
+
+    <MudDataGrid Items="_visits" Hover="true" Dense="true" SortMode="SortMode.Single" QuickFilter="@QuickFilter">
+        <Columns>
+            <PropertyColumn Property="x => x.CreatedAt" Title="@WhenLabel">
+                <CellTemplate><LocalTime Value="context.Item.CreatedAt" /></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.UserName" Title="@UserLabel">
+                <CellTemplate>@(context.Item.UserName ?? (context.Item.UserId?.ToString() ?? T["common.empty_dash"]))</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.IpAddress" Title="@IpLabel">
+                <CellTemplate>@(context.Item.IpAddress ?? T["common.empty_dash"])</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Path" Title="@PathLabel" />
+            <PropertyColumn Property="x => x.Method" Title="@MethodLabel" />
+            <PropertyColumn Property="x => x.StatusCode" Title="@StatusLabel" />
+            <PropertyColumn Property="x => x.DurationMs" Title="@MsLabel" />
+            <TemplateColumn Sortable="false" Title="@ReferrerLabel">
+                <CellTemplate><span class="truncate" title="@context.Item.Referrer">@(context.Item.Referrer ?? T["common.empty_dash"])</span></CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Sortable="false" Title="User-Agent">
+                <CellTemplate><span class="truncate" title="@context.Item.UserAgent">@(context.Item.UserAgent ?? T["common.empty_dash"])</span></CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="SiteVisitDto" />
+        </PagerContent>
+    </MudDataGrid>
 }
 
 @code {
     private IReadOnlyList<SiteVisitDto>? _visits;
+    private string _searchString = "";
 
     private string WhenLabel => T["web.dashboard.when_column"];
     private string UserLabel => T["web.dashboard.user_column"];
@@ -54,4 +61,12 @@ else
     private string ReferrerLabel => T["web.visitors.referrer_column"];
 
     protected override async Task OnInitializedAsync() => _visits = await Api.GetSiteVisitsAsync();
+
+    private bool QuickFilter(SiteVisitDto v)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString)) return true;
+        return v.Path.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+            || (v.UserName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (v.IpAddress?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
 }

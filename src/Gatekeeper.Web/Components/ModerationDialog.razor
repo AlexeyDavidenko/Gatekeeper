@@ -1,0 +1,63 @@
+@* Ban/Mute/Kick/Warn — separate from Approve/Reject, acts on the Telegram user directly (see
+   AttachEvidenceHandler's doc comment for why creating the action and attaching evidence are
+   deliberately independent operations). Opened from Detail.razor as a MudDialog instead of the
+   always-visible inline form this used to be. *@
+@inject AdminApiClient Api
+@inject Translator T
+
+<MudDialog>
+    <TitleContent>@T["web.detail.moderation_title"]</TitleContent>
+    <DialogContent>
+        <MudSelect T="string" @bind-Value="_action" Label="@T["web.detail.moderation_title"]">
+            <MudSelectItem Value="@("Ban")">@T["web.detail.action_ban"]</MudSelectItem>
+            <MudSelectItem Value="@("Mute")">@T["web.detail.action_mute"]</MudSelectItem>
+            <MudSelectItem Value="@("Kick")">@T["web.detail.action_kick"]</MudSelectItem>
+            <MudSelectItem Value="@("Warn")">@T["web.detail.action_warn"]</MudSelectItem>
+        </MudSelect>
+        <MudTextField @bind-Value="_reason" Placeholder="@T["web.detail.reason_placeholder"]" Class="mt-4" />
+        <MudFileUpload T="IBrowserFile" @bind-Files="_file" Accept="image/*" Class="mt-4">
+            <CustomContent Context="fileContext">
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AttachFile"
+                           OnClick="@fileContext.OpenFilePickerAsync">
+                    @(_file?.Name ?? T["web.detail.evidence_button"])
+                </MudButton>
+            </CustomContent>
+        </MudFileUpload>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["web.common.cancel"]</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_submitting">
+            @T["web.detail.apply_button"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public long TelegramUserId { get; set; }
+    [Parameter] public long ChatId { get; set; }
+    [Parameter] public long ActingUserId { get; set; }
+    [Parameter] public string? ActingUserName { get; set; }
+
+    private string _action = "Ban";
+    private string? _reason;
+    private IBrowserFile? _file;
+    private bool _submitting;
+
+    private async Task SubmitAsync()
+    {
+        _submitting = true;
+        var actionId = await Api.ModerateAsync(TelegramUserId, new ModerationRequest(
+            _action, _reason, null, ChatId, ActingUserId, ActingUserName, "Web", null));
+
+        if (_file is not null)
+        {
+            await using var stream = _file.OpenReadStream(maxAllowedSize: 10_000_000);
+            await Api.AttachEvidenceAsync(actionId, stream, _file.ContentType, _file.Name, ActingUserId);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

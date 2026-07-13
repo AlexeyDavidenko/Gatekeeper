@@ -39,6 +39,23 @@ else
         </MudItem>
     </MudGrid>
 
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">@T["web.dashboard.trend_title"]</MudText>
+                <MudChart ChartType="ChartType.Line" ChartSeries="@_trendSeries" ChartLabels="@_trendLabels"
+                          Width="100%" Height="300px" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">@T["web.dashboard.status_ratio_title"]</MudText>
+                <MudChart ChartType="ChartType.Donut" ChartSeries="@_statusSeries" ChartLabels="@_statusLabels"
+                          Width="100%" Height="300px" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
     <h2>@T["web.dashboard.recent_decisions_title"]</h2>
     @if (_summary.RecentDecisions.Count == 0)
     {
@@ -66,10 +83,43 @@ else
 @code {
     private DashboardSummary? _summary;
 
+    private List<ChartSeries<double>> _trendSeries = [];
+    private string[] _trendLabels = [];
+    private List<ChartSeries<double>> _statusSeries = [];
+    private string[] _statusLabels = [];
+
     private string WhenLabel => T["web.dashboard.when_column"];
     private string UserLabel => T["web.dashboard.user_column"];
     private string ActionLabel => T["web.dashboard.action_column"];
     private string DecidedByLabel => T["web.dashboard.decided_by_column"];
 
-    protected override async Task OnInitializedAsync() => _summary = await Api.GetDashboardAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _summary = await Api.GetDashboardAsync();
+
+        _trendLabels = _summary.Trend.Select(t => t.Day.ToString("dd.MM")).ToArray();
+        _trendSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = T["web.dashboard.approved"],
+                Data = new ChartData<double>(_summary.Trend.Select(t => (double)t.Approved).ToList()),
+            },
+            new ChartSeries<double>
+            {
+                Name = T["web.dashboard.rejected"],
+                Data = new ChartData<double>(_summary.Trend.Select(t => (double)t.Rejected).ToList()),
+            },
+        ];
+
+        _statusLabels = [T["web.dashboard.pending_label"], T["web.dashboard.week_label_approved"], T["web.dashboard.week_label_rejected"]];
+        _statusSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = T["web.dashboard.status_ratio_title"],
+                Data = new ChartData<double>((IReadOnlyList<double>)[_summary.PendingCount, _summary.ApprovedWeek, _summary.RejectedWeek]),
+            },
+        ];
+    }
 }

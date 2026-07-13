@@ -13,42 +13,57 @@
 <MudSnackbarProvider />
 <ReconnectModal />
 
-<div class="page">
-    <MudAppBar Elevation="1" Dense="true" Fixed="false">
-        <MudText Typo="Typo.h6" Class="mr-4">Gatekeeper</MudText>
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
         <AuthorizeView>
             <Authorized>
-                <MudNavLink Href="/" Match="NavLinkMatch.All">@T["web.nav.dashboard"]</MudNavLink>
-                <MudNavLink Href="/queue">@T["web.nav.queue"]</MudNavLink>
-                <MudNavLink Href="/history">@T["web.nav.history"]</MudNavLink>
-                <MudNavLink Href="/questions">@T["web.nav.questions"]</MudNavLink>
-                <AuthorizeView Context="ownerContext" Roles="Owner">
-                    <Authorized>
-                        <MudNavLink Href="/visitors">@T["web.nav.visitors"]</MudNavLink>
-                        <MudNavLink Href="/translations">@T["web.nav.translations"]</MudNavLink>
-                    </Authorized>
-                </AuthorizeView>
-                <MudSpacer />
-                <span class="user">@context.User.Identity?.Name</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                               OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+            </Authorized>
+        </AuthorizeView>
+        <BrandMark />
+        <MudSpacer />
+        <span class="lang-switch">
+            <a href="@LangUrl("ru")" class="@(Locale.LanguageCode == "ru" ? "active" : null)">RU</a>
+            /
+            <a href="@LangUrl("en")" class="@(Locale.LanguageCode == "en" ? "active" : null)">EN</a>
+        </span>
+        <AuthorizeView>
+            <Authorized>
+                <span class="user ml-4">@context.User.Identity?.Name</span>
                 <form method="post" action="auth/logout" class="inline">
                     <AntiforgeryToken />
                     <button type="submit" class="link">@T["web.nav.logout"]</button>
                 </form>
             </Authorized>
         </AuthorizeView>
-        <span class="lang-switch">
-            <a href="@LangUrl("ru")" class="@(Locale.LanguageCode == "ru" ? "active" : null)">RU</a>
-            /
-            <a href="@LangUrl("en")" class="@(Locale.LanguageCode == "en" ? "active" : null)">EN</a>
-        </span>
     </MudAppBar>
-    <main>
+    <AuthorizeView>
+        <Authorized>
+            <MudDrawer @bind-Open="_drawerOpen" Breakpoint="Breakpoint.Md" Elevation="1" ClipMode="DrawerClipMode.Always">
+                <MudNavMenu>
+                    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">@T["web.nav.dashboard"]</MudNavLink>
+                    <MudNavLink Href="/queue" Icon="@Icons.Material.Filled.PendingActions">@T["web.nav.queue"]</MudNavLink>
+                    <MudNavLink Href="/history" Icon="@Icons.Material.Filled.History">@T["web.nav.history"]</MudNavLink>
+                    <MudNavLink Href="/questions" Icon="@Icons.Material.Filled.QuestionAnswer">@T["web.nav.questions"]</MudNavLink>
+                    <AuthorizeView Context="ownerContext" Roles="Owner">
+                        <Authorized>
+                            <MudNavLink Href="/visitors" Icon="@Icons.Material.Filled.Groups">@T["web.nav.visitors"]</MudNavLink>
+                            <MudNavLink Href="/translations" Icon="@Icons.Material.Filled.Translate">@T["web.nav.translations"]</MudNavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                </MudNavMenu>
+            </MudDrawer>
+        </Authorized>
+    </AuthorizeView>
+    <MudMainContent Class="page">
         @Body
-    </main>
-</div>
+    </MudMainContent>
+</MudLayout>
 
 @code {
     private bool _isDarkMode;
+    private bool _drawerOpen = true;
     private string _previousPath = "/";
 
     private readonly MudTheme _theme = new()

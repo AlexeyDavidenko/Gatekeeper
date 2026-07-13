@@ -94,3 +94,22 @@ public sealed class UnarchiveModerationActionHandler(IModerationRepository moder
         await unitOfWork.SaveChangesAsync(ct);
     }
 }
+
+/// <summary>Bulk restore for the History grid's multi-select — same per-row Unarchive() as the
+/// single-id handler above, just looped with one shared SaveChangesAsync instead of N round trips.</summary>
+public sealed record UnarchiveModerationActionsCommand(IReadOnlyList<long> ModerationActionIds);
+
+public sealed class UnarchiveModerationActionsHandler(IModerationRepository moderation, IUnitOfWork unitOfWork)
+{
+    public async Task HandleAsync(UnarchiveModerationActionsCommand cmd, CancellationToken ct = default)
+    {
+        foreach (var id in cmd.ModerationActionIds)
+        {
+            var action = await moderation.GetAsync(id, ct)
+                ?? throw new InvalidOperationException($"ModerationAction {id} not found.");
+            action.Unarchive();
+        }
+
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+}

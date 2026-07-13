@@ -70,6 +70,7 @@ public sealed record ModerationLogEntry(
 // Owner-triggered bulk cleanup of old moderation-log entries — no automatic/scheduled purge exists.
 public sealed record ArchiveModerationActionsRequest(DateTimeOffset OlderThan);
 public sealed record ArchiveModerationActionsResponse(int ArchivedCount);
+public sealed record UnarchiveModerationActionsRequest(IReadOnlyList<long> ModerationActionIds);
 
 // Site visitor log — page views against the admin site itself, not moderation actions.
 public sealed record RecordSiteVisitRequest(
@@ -80,12 +81,18 @@ public sealed record SiteVisitDto(
     long Id, long? UserId, string? UserName, string SessionId, string? IpAddress, string Path, string Method,
     int StatusCode, long DurationMs, string? UserAgent, string? Referrer, DateTimeOffset CreatedAt);
 
+/// <summary>One day's approve/reject counts for the dashboard's trend chart — always exactly one
+/// entry per day in the requested window, even on days with zero activity (so a line chart never
+/// has to guess at a gap).</summary>
+public sealed record DashboardTrendPoint(DateOnly Day, int Approved, int Rejected);
+
 public sealed record DashboardSummary(
     int PendingCount,
     int ApprovedToday, int RejectedToday,
     int ApprovedWeek, int RejectedWeek,
     int OutboxPending, int OutboxInFlight, int OutboxFailed,
-    IReadOnlyList<ModerationLogEntry> RecentDecisions);
+    IReadOnlyList<ModerationLogEntry> RecentDecisions,
+    IReadOnlyList<DashboardTrendPoint> Trend);
 
 // The bot's own "/status" DM command — a cross-tenant lookup (see the endpoint doc comment), so
 // unlike everything else here it carries no tenant id: the caller doesn't need one to show it.

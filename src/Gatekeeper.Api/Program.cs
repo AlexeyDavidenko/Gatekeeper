@@ -54,6 +54,7 @@ builder.Services.AddScoped<StartSurveyHandler>();
 builder.Services.AddScoped<ModerateUserHandler>();
 builder.Services.AddScoped<ArchiveModerationActionsHandler>();
 builder.Services.AddScoped<UnarchiveModerationActionHandler>();
+builder.Services.AddScoped<UnarchiveModerationActionsHandler>();
 builder.Services.AddScoped<AttachEvidenceHandler>();
 
 // Evidence-attachment storage — see MinioEvidenceStorage. Singleton: the client/bucket-name pair

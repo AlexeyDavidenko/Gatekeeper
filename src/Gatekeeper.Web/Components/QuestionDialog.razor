@@ -1,0 +1,95 @@
+@* Create/edit a survey question — replaces the old inline add-form on Questions.razor and the
+   separate QuestionEdit.razor page/route. QuestionId null = create mode. Prompt/options values are
+   collected explicitly from RichTextEditor/QuestionTypeEditor right before saving (see those
+   components' CollectAsync/GetValueAsync doc comments) since this dialog submits via a button
+   click, not a native <form> POST. *@
+@inject AdminApiClient Api
+@inject Translator T
+
+<MudDialog>
+    <TitleContent>@(IsEdit ? T["web.questionedit.title"] : T["web.questions.add_title"])</TitleContent>
+    <DialogContent>
+        @if (IsEdit && !_loaded)
+        {
+            <p>@T["web.common.loading"]</p>
+        }
+        else
+        {
+            <RichTextEditor @ref="_promptEditor" Name="promptText" Value="@_promptText" />
+            <p class="muted">@T["web.questions.prompt_en_label"]</p>
+            <RichTextEditor @ref="_promptEditorEn" Name="promptTextEn" Value="@_promptTextEn" Required="false" />
+            <MudCheckBox T="bool" Value="_isRequired" ValueChanged="@((bool v) => _isRequired = v)"
+                         Label="@T["web.questions.required_checkbox"]" Class="mt-2" />
+            @if (IsEdit)
+            {
+                <MudCheckBox T="bool" Value="_isActive" ValueChanged="@((bool v) => _isActive = v)"
+                             Label="@T["web.questionedit.active_checkbox"]" />
+            }
+            <QuestionTypeEditor @ref="_typeEditor" Type="@_type" Options="@_options" OptionsEn="@_optionsEn" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["web.common.cancel"]</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_saving || (IsEdit && !_loaded))">
+            @(IsEdit ? T["web.questionedit.save_button"] : T["web.questions.add_button"])
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public long? QuestionId { get; set; }
+
+    private bool IsEdit => QuestionId is not null;
+    private bool _loaded;
+
+    private RichTextEditor? _promptEditor;
+    private RichTextEditor? _promptEditorEn;
+    private QuestionTypeEditor? _typeEditor;
+
+    private string? _promptText;
+    private string? _promptTextEn;
+    private bool _isRequired = true;
+    private bool _isActive = true;
+    private string _type = "Text";
+    private IReadOnlyList<string>? _options;
+    private IReadOnlyList<string>? _optionsEn;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (QuestionId is { } id)
+        {
+            var q = await Api.GetQuestionAsync(id);
+            if (q is not null)
+            {
+                _promptText = q.PromptText;
+                _promptTextEn = q.PromptTextEn;
+                _isRequired = q.IsRequired;
+                _isActive = q.IsActive;
+                _type = q.Type;
+                _options = q.Options;
+                _optionsEn = q.OptionsEn;
+            }
+        }
+        _loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        var promptText = RichTextSanitizer.Sanitize(await _promptEditor!.GetValueAsync());
+        var promptTextEnRaw = await _promptEditorEn!.GetValueAsync();
+        var promptTextEn = string.IsNullOrWhiteSpace(promptTextEnRaw) ? null : RichTextSanitizer.Sanitize(promptTextEnRaw);
+        var (type, options, optionsEn) = await _typeEditor!.CollectAsync();
+
+        if (QuestionId is { } id)
+            await Api.EditQuestionAsync(id, type, promptText, _isRequired, options, _isActive, promptTextEn, optionsEn);
+        else
+            await Api.CreateQuestionAsync(type, promptText, _isRequired, options, promptTextEn, optionsEn);
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

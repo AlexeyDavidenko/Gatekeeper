@@ -1,13 +1,28 @@
 // select-toggle wiring is called from QuestionTypeEditor.razor's own OnAfterRenderAsync — see the
 // comment there for why this is driven by the component's render lifecycle rather than a
-// document-level DOMContentLoaded listener.
+// document-level DOMContentLoaded listener. Looks up the select/options-block from the component's
+// own container (not `closest('form')`) since QuestionDialog.razor hosts this with no <form>
+// ancestor at all — submission is a dialog button click, not a native form POST.
 window.gatekeeperQuestionOptions = {
-    init(select) {
-        const optionsBlock = select.closest('form')?.querySelector('.q-options');
-        if (!optionsBlock) return;
+    init(container) {
+        const select = container.querySelector('.q-type-select');
+        const optionsBlock = container.querySelector('.q-options');
+        if (!select || !optionsBlock) return;
         const sync = () => { optionsBlock.hidden = select.value !== 'SingleChoice' && select.value !== 'MultiChoice'; };
         select.addEventListener('change', sync);
         sync();
+    },
+
+    // Reads the selected type plus the current RU/EN option values straight from the DOM, in row
+    // order — the source of truth for the select and these dynamically added/removed rows lives
+    // only there, never in Blazor's own state. Used by QuestionDialog.razor right before saving.
+    collect(container) {
+        const rows = [...container.querySelectorAll('.q-option-row')];
+        return {
+            type: container.querySelector('.q-type-select')?.value ?? 'Text',
+            options: rows.map(r => r.querySelector('input[name=options]')?.value ?? ''),
+            optionsEn: rows.map(r => r.querySelector('input[name=optionsEn]')?.value ?? ''),
+        };
     },
 };
 

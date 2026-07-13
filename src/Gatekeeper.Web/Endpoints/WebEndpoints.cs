@@ -94,71 +94,12 @@ public static class WebEndpoints
         apps.MapPost("/{id:long}/reject", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
             => DecideAsync(id, approve: false, ctx, api, af, ct));
 
-        // Ban/Mute/Kick/Warn — separate from approve/reject above, acts on the Telegram user, not
-        // the application. Evidence upload (optional) is a second call, only if a file was chosen —
-        // see AttachEvidenceHandler's doc comment for why creating the action and attaching
-        // evidence are deliberately independent operations.
-        apps.MapPost("/{id:long}/moderate", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            var form = await ctx.Request.ReadFormAsync(ct);
-            if (!long.TryParse(form["telegramUserId"], out var telegramUserId) || !long.TryParse(form["chatId"], out var chatId))
-                return Results.BadRequest("Missing telegramUserId/chatId.");
+        // Ban/Mute/Kick/Warn now opens a MudDialog (ModerationDialog.razor) from Detail.razor and
+        // calls AdminApiClient.ModerateAsync/AttachEvidenceAsync directly in-circuit — no form post,
+        // no route needed for it.
 
-            var (actingUserId, actingUserName) = CurrentUser(ctx);
-            var actionId = await api.ModerateAsync(telegramUserId, new ModerationRequest(
-                form["action"].ToString(), form["reason"], null, chatId, actingUserId, actingUserName, "Web", null), ct);
-
-            var evidence = form.Files["evidence"];
-            if (evidence is { Length: > 0 })
-            {
-                await using var stream = evidence.OpenReadStream();
-                await api.AttachEvidenceAsync(actionId, stream, evidence.ContentType, evidence.FileName, actingUserId, ct);
-            }
-
-            return Results.Redirect($"applications/{id}");
-        });
-
-        // Question management form posts — same auth/antiforgery shape as decisions above.
-        // NB: these must NOT share a URL with a @page route (Razor component endpoints match
-        // any HTTP verb on their route template) — "/questions/{id}/edit" collided with
-        // QuestionEdit.razor's own "/questions/{Id:long}/edit" page route and threw
-        // AmbiguousMatchException on every submit. Suffixed "/create" and "/save" instead.
-        var questions = app.MapGroup("/questions").RequireAuthorization();
-        questions.MapPost("/create", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            var form = await ctx.Request.ReadFormAsync(ct);
-            var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
-            var promptTextEn = form["promptTextEn"].ToString() is { Length: > 0 } pEn ? RichTextSanitizer.Sanitize(pEn) : null;
-            var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
-            await api.CreateQuestionAsync(
-                type, promptText, form["isRequired"] == "true", ParseOptions(form, type, "options"),
-                promptTextEn, ParseOptions(form, type, "optionsEn"), ct);
-            return Results.Redirect("/questions");
-        });
-        questions.MapPost("/{id:long}/save", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            var form = await ctx.Request.ReadFormAsync(ct);
-            var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
-            var promptTextEn = form["promptTextEn"].ToString() is { Length: > 0 } pEn ? RichTextSanitizer.Sanitize(pEn) : null;
-            var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
-            await api.EditQuestionAsync(
-                id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type, "options"),
-                form["isActive"] == "true", promptTextEn, ParseOptions(form, type, "optionsEn"), ct);
-            return Results.Redirect("/questions");
-        });
-        questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
-            => MoveAsync(id, up: true, ctx, api, af, ct));
-        questions.MapPost("/{id:long}/move-down", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
-            => MoveAsync(id, up: false, ctx, api, af, ct));
-        questions.MapPost("/{id:long}/deactivate", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            await api.DeactivateQuestionAsync(id, ct);
-            return Results.Redirect("/questions");
-        });
+        // Question management (create/edit/move/deactivate) now all calls AdminApiClient directly
+        // in-circuit from Questions.razor/QuestionDialog.razor — no form posts, no routes needed.
 
         // Moderation-log archiving form posts (History.razor, Owner-only control) — same
         // auth/antiforgery shape as decisions/questions above.
@@ -172,12 +113,8 @@ public static class WebEndpoints
             var count = await api.ArchiveModerationActionsAsync(olderThan, ct);
             return Results.Redirect($"/history?includeArchived=true&archived={count}");
         });
-        history.MapPost("/{id:long}/unarchive", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            await api.UnarchiveModerationActionAsync(id, ct);
-            return Results.Redirect("/history?includeArchived=true");
-        });
+        // Single/bulk restore now call AdminApiClient directly in-circuit from History.razor's
+        // MudDataGrid row action / bulk-select button — no form post, no route needed for them.
 
         // /translations editor (Owner-only, enforced by the page itself — this form post shares its
         // route prefix but the antiforgery+auth cookie already gates it the same way). Refreshes
@@ -203,14 +140,6 @@ public static class WebEndpoints
         return app;
     }
 
-    private static async Task<IResult> MoveAsync(
-        long id, bool up, HttpContext ctx, AdminApiClient api, IAntiforgery antiforgery, CancellationToken ct)
-    {
-        await ValidateAsync(antiforgery, ctx);
-        await api.MoveQuestionAsync(id, up, ct);
-        return Results.Redirect("/questions");
-    }
-
     private static async Task<IResult> DecideAsync(
         long id, bool approve, HttpContext ctx, AdminApiClient api, IAntiforgery antiforgery, CancellationToken ct)
     {
@@ -223,17 +152,6 @@ public static class WebEndpoints
         var (userId, name) = CurrentUser(ctx);
         var outcome = await api.DecideAsync(id, rowVersion, approve, form["reason"], userId, name, ct);
         return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/queue?notice=conflict" : "/queue");
-    }
-
-    // fieldName is "options" (RU, required) or "optionsEn" (EN, optional — see QuestionTypeEditor's
-    // paired-row markup). Blank-filtering means a partially-filled EN list naturally ends up shorter
-    // than the RU list, which Question.OptionsFor already treats as "not translated" and ignores
-    // wholesale rather than risk a misaligned answer index — no special casing needed here.
-    private static IReadOnlyList<string>? ParseOptions(IFormCollection form, string type, string fieldName)
-    {
-        if (type is not ("SingleChoice" or "MultiChoice")) return null;
-        var values = form[fieldName].Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()).ToList();
-        return values.Count > 0 ? values : null;
     }
 
     private static async Task ValidateAsync(IAntiforgery antiforgery, HttpContext ctx)

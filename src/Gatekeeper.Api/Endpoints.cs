@@ -450,6 +450,14 @@ public static class ModerationEndpoints
             return Results.NoContent();
         });
 
+        // Bulk restore for the History grid's multi-select — see UnarchiveModerationActionsHandler.
+        app.MapPost("/moderation/unarchive-batch", async (
+            UnarchiveModerationActionsRequest body, UnarchiveModerationActionsHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new UnarchiveModerationActionsCommand(body.ModerationActionIds), ct);
+            return Results.NoContent();
+        });
+
         return app;
     }
 }
@@ -494,19 +502,33 @@ public static class DashboardEndpoints
             var now = clock.UtcNow;
             var todayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
             var weekStart = todayStart.AddDays(-7);
+            var trendStart = todayStart.AddDays(-13);   // 14 days inclusive of today, for the trend chart
 
             var pendingCount = await db.Applications.AsNoTracking()
                 .CountAsync(a => a.Status == ApplicationStatus.AwaitingReview, ct);
 
+            // Widened to 14 days (from the "this week" 7) so the same fetch also covers the trend
+            // chart below — approvedWeek/rejectedWeek still filter down to the last 7 explicitly.
             var decisions = await db.ModerationActions.AsNoTracking()
-                .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+                .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
                     (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
                 .ToListAsync(ct);
 
             var approvedToday = decisions.Count(a => a.CreatedAt >= todayStart && a.Action == ModerationActionType.Approve);
             var rejectedToday = decisions.Count(a => a.CreatedAt >= todayStart && a.Action == ModerationActionType.Reject);
-            var approvedWeek = decisions.Count(a => a.Action == ModerationActionType.Approve);
-            var rejectedWeek = decisions.Count(a => a.Action == ModerationActionType.Reject);
+            var approvedWeek = decisions.Count(a => a.CreatedAt >= weekStart && a.Action == ModerationActionType.Approve);
+            var rejectedWeek = decisions.Count(a => a.CreatedAt >= weekStart && a.Action == ModerationActionType.Reject);
+
+            // One point per day, oldest first — filled explicitly via Range so a zero-activity day
+            // still produces a (0, 0) entry instead of a gap (the frontend line chart needs a
+            // continuous x-axis).
+            var trend = Enumerable.Range(0, 14)
+                .Select(i => trendStart.AddDays(i))
+                .Select(day => new DashboardTrendPoint(
+                    DateOnly.FromDateTime(day.UtcDateTime),
+                    decisions.Count(a => a.CreatedAt.UtcDateTime.Date == day.UtcDateTime.Date && a.Action == ModerationActionType.Approve),
+                    decisions.Count(a => a.CreatedAt.UtcDateTime.Date == day.UtcDateTime.Date && a.Action == ModerationActionType.Reject)))
+                .ToList();
 
             var outboxPending = await db.TelegramCommands.AsNoTracking()
                 .CountAsync(c => c.Status == TelegramCommandStatus.Pending, ct);
@@ -538,7 +560,7 @@ public static class DashboardEndpoints
 
             return Results.Ok(new DashboardSummary(
                 pendingCount, approvedToday, rejectedToday, approvedWeek, rejectedWeek,
-                outboxPending, outboxInFlight, outboxFailed, recentDtos));
+                outboxPending, outboxInFlight, outboxFailed, recentDtos, trend));
         });
 
         return app;

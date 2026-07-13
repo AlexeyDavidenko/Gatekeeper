@@ -1,6 +1,14 @@
 // Called from RichTextEditor.razor's own OnAfterRenderAsync — see the comment there for why this is
 // driven by the component's render lifecycle rather than a document-level DOMContentLoaded listener.
 window.gatekeeperRichText = {
+    // Reads the hidden input's current value — the .rte-editor's own 'input' listener (below) keeps
+    // it live-synced on every keystroke, so this just returns whatever's already there. Needed
+    // because dialog-based submits (QuestionDialog.razor) call this explicitly instead of relying
+    // on a native <form> POST to serialize the hidden input for them.
+    getValue(wrapper) {
+        return wrapper.querySelector('input[type=hidden]')?.value ?? '';
+    },
+
     init(wrapper) {
         const editor = wrapper.querySelector('.rte-editor');
         const hidden = wrapper.querySelector('input[type=hidden]');

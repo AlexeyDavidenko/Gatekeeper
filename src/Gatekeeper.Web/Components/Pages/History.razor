@@ -16,34 +16,48 @@ else if (_apps.Count == 0)
 }
 else
 {
-    <MudTable Items="_apps" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>#</MudTh>
-            <MudTh></MudTh>
-            <MudTh>@UserLabel</MudTh>
-            <MudTh>@StatusLabel</MudTh>
-            <MudTh>@SubmittedLabel</MudTh>
-            <AuthorizeView Context="ownerContext" Roles="Owner">
-                <Authorized><MudTh>@ByLabel</MudTh><MudTh>@SourceLabel</MudTh></Authorized>
-            </AuthorizeView>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="#">@context.Id</MudTd>
-            <MudTd><Avatar PhotoFileId="@context.PhotoFileId" DisplayName="@context.DisplayName" Username="@context.Username" /></MudTd>
-            <MudTd DataLabel="@UserLabel">@(context.DisplayName ?? T["common.empty_dash"]) @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
-            <MudTd DataLabel="@StatusLabel">@(context.Status == "Approved" ? T["web.history.approved"] : T["web.history.rejected"])</MudTd>
-            <MudTd DataLabel="@SubmittedLabel"><LocalTime Value="context.SubmittedAt" /></MudTd>
-            <AuthorizeView Context="ownerContext" Roles="Owner">
-                <Authorized>
-                    @{ var decision = _decisions.GetValueOrDefault(context.Id); }
-                    <MudTd DataLabel="@ByLabel">@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? T["common.empty_dash"])</MudTd>
-                    <MudTd DataLabel="@SourceLabel">@(decision?.Source ?? T["common.empty_dash"])</MudTd>
-                </Authorized>
-            </AuthorizeView>
-            <MudTd><a href="applications/@context.Id">@T["web.queue.open_link"]</a></MudTd>
-        </RowTemplate>
-    </MudTable>
+    <MudDataGrid Items="_apps" Hover="true" Dense="true" SortMode="SortMode.Single">
+        <Columns>
+            <PropertyColumn Property="x => x.Id" Title="#" />
+            <TemplateColumn Sortable="false" Title="">
+                <CellTemplate>
+                    <Avatar PhotoFileId="@context.Item.PhotoFileId" DisplayName="@context.Item.DisplayName" Username="@context.Item.Username" />
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.DisplayName" Title="@UserLabel">
+                <CellTemplate>
+                    @(context.Item.DisplayName ?? T["common.empty_dash"]) @(context.Item.Username is null ? "" : $"(@{context.Item.Username})")
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Status" Title="@StatusLabel">
+                <CellTemplate>@(context.Item.Status == "Approved" ? T["web.history.approved"] : T["web.history.rejected"])</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.SubmittedAt" Title="@SubmittedLabel">
+                <CellTemplate><LocalTime Value="context.Item.SubmittedAt" /></CellTemplate>
+            </PropertyColumn>
+            @if (_isOwner)
+            {
+                <TemplateColumn Sortable="false" Title="@ByLabel">
+                    <CellTemplate>
+                        @{ var decision = _decisions.GetValueOrDefault(context.Item.Id); }
+                        @(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? T["common.empty_dash"])
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Sortable="false" Title="@SourceLabel">
+                    <CellTemplate>@(_decisions.GetValueOrDefault(context.Item.Id)?.Source ?? T["common.empty_dash"])</CellTemplate>
+                </TemplateColumn>
+            }
+            <TemplateColumn Sortable="false" Title="">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                   Href="@($"applications/{context.Item.Id}")" title="@T["web.queue.open_link"]" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="ApplicationSummary" />
+        </PagerContent>
+    </MudDataGrid>
 }
 
 <AuthorizeView Context="archiveContext" Roles="Owner">
@@ -78,40 +92,59 @@ else
             }
             else
             {
-                <MudTable Items="_archived" Hover="true" Dense="true">
-                    <HeaderContent>
-                        <MudTh>@WhenLabel</MudTh>
-                        <MudTh>@ActionLabel</MudTh>
-                        <MudTh>@ApplicationLabel</MudTh>
-                        <MudTh>@ByLabel</MudTh>
-                        <MudTh>@ArchivedAtLabel</MudTh>
-                        <MudTh></MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="@WhenLabel"><LocalTime Value="context.CreatedAt" /></MudTd>
-                        <MudTd DataLabel="@ActionLabel">@context.Action</MudTd>
-                        <MudTd DataLabel="@ApplicationLabel">@(context.ApplicationId?.ToString() ?? T["common.empty_dash"])</MudTd>
-                        <MudTd DataLabel="@ByLabel">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
-                        <MudTd DataLabel="@ArchivedAtLabel"><LocalTime Value="context.ArchivedAt" /></MudTd>
-                        <MudTd>
-                            <form method="post" action="history/@context.Id/unarchive" class="inline">
-                                <AntiforgeryToken /><button type="submit" class="link">@T["web.history.unarchive_button"]</button>
-                            </form>
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
+                @if (_selectedArchived.Count > 0)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="my-2"
+                               OnClick="RestoreSelectedAsync">
+                        @T["web.history.unarchive_selected_button"] (@_selectedArchived.Count)
+                    </MudButton>
+                }
+
+                <MudDataGrid Items="_archived" Hover="true" Dense="true" SortMode="SortMode.Single"
+                             MultiSelection="true" @bind-SelectedItems="_selectedArchived">
+                    <Columns>
+                        <SelectColumn T="ModerationLogEntry" />
+                        <PropertyColumn Property="x => x.CreatedAt" Title="@WhenLabel">
+                            <CellTemplate><LocalTime Value="context.Item.CreatedAt" /></CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Action" Title="@ActionLabel" />
+                        <TemplateColumn Sortable="false" Title="@ApplicationLabel">
+                            <CellTemplate>@(context.Item.ApplicationId?.ToString() ?? T["common.empty_dash"])</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Sortable="false" Title="@ByLabel">
+                            <CellTemplate>@(context.Item.PerformedByName ?? context.Item.PerformedByUserId.ToString())</CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.ArchivedAt" Title="@ArchivedAtLabel">
+                            <CellTemplate><LocalTime Value="context.Item.ArchivedAt" /></CellTemplate>
+                        </PropertyColumn>
+                        <TemplateColumn Sortable="false" Title="">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
+                                               title="@T["web.history.unarchive_button"]"
+                                               OnClick="@(() => RestoreAsync(context.Item.Id))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <PagerContent>
+                        <MudDataGridPager T="ModerationLogEntry" />
+                    </PagerContent>
+                </MudDataGrid>
             }
         }
     </Authorized>
 </AuthorizeView>
 
 @code {
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthStateTask { get; set; }
+
     private bool IncludeArchived;
     private int? Archived;
+    private bool _isOwner;
 
     private IReadOnlyList<ApplicationSummary>? _apps;
     private Dictionary<long, ModerationLogEntry> _decisions = [];
     private IReadOnlyList<ModerationLogEntry> _archived = [];
+    private HashSet<ModerationLogEntry> _selectedArchived = [];
 
     private string UserLabel => T["web.dashboard.user_column"];
     private string StatusLabel => T["web.detail.status_label"];
@@ -125,6 +158,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (AuthStateTask is not null)
+        {
+            var state = await AuthStateTask;
+            _isOwner = state.User.IsInRole("Owner");
+        }
+
         // Same manual query-string read as Login.razor's "?error=" — this app has no
         // [SupplyParameterFromQuery] precedent, keep the one established pattern.
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
@@ -132,14 +171,19 @@ else
         if (query.TryGetValue("archived", out var a) && int.TryParse(a, out var archivedCount))
             Archived = archivedCount;
 
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
         var approved = await Api.GetByStatusAsync("Approved");
         var rejected = await Api.GetByStatusAsync("Rejected");
         _apps = approved.Concat(rejected).OrderByDescending(a => a.SubmittedAt).ToList();
 
         // "Кем"/"Откуда" — same audit-log data as /audit, just joined onto each application by id
-        // (only Owners see these two columns; the fetch itself is harmless either way since
-        // AuthorizeView suppresses rendering server-side for anyone else). Archived decisions stay
-        // out of this join on purpose — archiving hides "internal kitchen" audit detail, not the
+        // (only Owners see these two columns; the fetch itself is harmless either way since the
+        // column itself is hidden server-side for anyone else). Archived decisions stay out of
+        // this join on purpose — archiving hides "internal kitchen" audit detail, not the
         // application itself, which the main table above always shows regardless.
         var log = await Api.GetAuditLogAsync();
         _decisions = log
@@ -152,5 +196,18 @@ else
             var full = await Api.GetAuditLogAsync(includeArchived: true);
             _archived = full.Where(e => e.IsArchived).OrderByDescending(e => e.ArchivedAt).ToList();
         }
+    }
+
+    private async Task RestoreAsync(long id)
+    {
+        await Api.UnarchiveModerationActionAsync(id);
+        await LoadAsync();
+    }
+
+    private async Task RestoreSelectedAsync()
+    {
+        await Api.UnarchiveModerationActionsAsync(_selectedArchived.Select(e => e.Id).ToList());
+        _selectedArchived = [];
+        await LoadAsync();
     }
 }

@@ -34,4 +34,8 @@
         if (firstRender)
             await JS.InvokeVoidAsync("gatekeeperRichText.init", _wrapper);
     }
+
+    /// <summary>Reads the editor's current HTML — for dialog-based submits (no native &lt;form&gt;
+    /// POST to serialize the hidden input for them), called explicitly right before saving.</summary>
+    public ValueTask<string> GetValueAsync() => JS.InvokeAsync<string>("gatekeeperRichText.getValue", _wrapper);
 }

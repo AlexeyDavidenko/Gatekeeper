@@ -35,7 +35,7 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         using var res = await http.SendAsync(Get("/dashboard"), ct);
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<DashboardSummary>(ct)
-            ?? new DashboardSummary(0, 0, 0, 0, 0, 0, 0, 0, []);
+            ?? new DashboardSummary(0, 0, 0, 0, 0, 0, 0, 0, [], []);
     }
 
     public async Task<IReadOnlyList<ModerationLogEntry>> GetAuditLogAsync(bool includeArchived = false, CancellationToken ct = default)
@@ -56,6 +56,12 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
     public async Task UnarchiveModerationActionAsync(long id, CancellationToken ct = default)
     {
         using var res = await http.SendAsync(Post($"/moderation/{id}/unarchive"), ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    public async Task UnarchiveModerationActionsAsync(IReadOnlyList<long> ids, CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Post("/moderation/unarchive-batch", new UnarchiveModerationActionsRequest(ids)), ct);
         res.EnsureSuccessStatusCode();
     }
 

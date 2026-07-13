@@ -4,16 +4,22 @@
 @inject NavigationManager Nav
 @inject Translator T
 
-<h1>@T["web.login.title"]</h1>
-<p>@T["web.login.subtitle"]</p>
+<div class="d-flex align-center justify-center" style="min-height: 80vh;">
+    <MudPaper Class="pa-8" Style="max-width: 420px; width: 100%;" Elevation="3">
+        <div class="d-flex justify-center mb-4">
+            <BrandMark IconSize="Size.Large" TextTypo="Typo.h4" />
+        </div>
+        <MudText Typo="Typo.body1" Class="mud-text-secondary text-center mb-4">@T["web.login.subtitle"]</MudText>
 
-@if (Error is not null)
-{
-    <p class="error">@Error</p>
-}
+        @if (Error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@Error</MudAlert>
+        }
 
-<div class="widget">
-    @((MarkupString)WidgetHtml)
+        <div class="d-flex justify-center widget">
+            @((MarkupString)WidgetHtml)
+        </div>
+    </MudPaper>
 </div>
 
 @code {

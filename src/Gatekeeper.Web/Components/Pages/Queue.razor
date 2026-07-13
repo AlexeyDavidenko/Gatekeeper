@@ -21,27 +21,44 @@ else if (_apps.Count == 0)
 }
 else
 {
-    <MudTable Items="_apps" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>#</MudTh>
-            <MudTh></MudTh>
-            <MudTh>@UserLabel</MudTh>
-            <MudTh>@SubmittedLabel</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="#">@context.Id</MudTd>
-            <MudTd><Avatar PhotoFileId="@context.PhotoFileId" DisplayName="@context.DisplayName" Username="@context.Username" /></MudTd>
-            <MudTd DataLabel="@UserLabel">@(context.DisplayName ?? T["common.empty_dash"]) @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
-            <MudTd DataLabel="@SubmittedLabel"><LocalTime Value="context.SubmittedAt" /></MudTd>
-            <MudTd><a href="applications/@context.Id">@T["web.queue.open_link"]</a></MudTd>
-        </RowTemplate>
-    </MudTable>
+    <MudTextField T="string" Value="_searchString" ValueChanged="@((string v) => _searchString = v)"
+                  Placeholder="@T["web.common.search"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Class="mb-2" />
+
+    <MudDataGrid Items="_apps" Hover="true" Dense="true" SortMode="SortMode.Single" Filterable="false"
+                 QuickFilter="@QuickFilter">
+        <Columns>
+            <PropertyColumn Property="x => x.Id" Title="#" />
+            <TemplateColumn Sortable="false" Title="">
+                <CellTemplate>
+                    <Avatar PhotoFileId="@context.Item.PhotoFileId" DisplayName="@context.Item.DisplayName" Username="@context.Item.Username" />
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.DisplayName" Title="@UserLabel">
+                <CellTemplate>
+                    @(context.Item.DisplayName ?? T["common.empty_dash"]) @(context.Item.Username is null ? "" : $"(@{context.Item.Username})")
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.SubmittedAt" Title="@SubmittedLabel">
+                <CellTemplate><LocalTime Value="context.Item.SubmittedAt" /></CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Sortable="false" Title="">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                   Href="@($"applications/{context.Item.Id}")" title="@T["web.queue.open_link"]" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="ApplicationSummary" />
+        </PagerContent>
+    </MudDataGrid>
 }
 
 @code {
     private IReadOnlyList<ApplicationSummary>? _apps;
     private string? _notice;
+    private string _searchString = "";
 
     private string UserLabel => T["web.dashboard.user_column"];
     private string SubmittedLabel => T["web.queue.submitted_column"];
@@ -51,5 +68,13 @@ else
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
         if (query.TryGetValue("notice", out var n)) _notice = n;
         _apps = await Api.GetPendingAsync();
+    }
+
+    private bool QuickFilter(ApplicationSummary a)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString)) return true;
+        return a.Id.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+            || (a.DisplayName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (a.Username?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 }

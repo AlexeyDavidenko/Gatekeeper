@@ -2,8 +2,15 @@
 @attribute [Authorize]
 @inject AdminApiClient Api
 @inject Translator T
+@inject IDialogService DialogService
 
-<h1>@T["web.questions.title"]</h1>
+<div class="d-flex align-center justify-space-between">
+    <h1>@T["web.questions.title"]</h1>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="@(() => OpenDialogAsync(null))">
+        @T["web.questions.add_title"]
+    </MudButton>
+</div>
 
 @if (_questions is null)
 {
@@ -15,52 +22,42 @@ else if (_questions.Count == 0)
 }
 else
 {
-    <MudTable Items="_questions" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>#</MudTh>
-            <MudTh>@TextLabel</MudTh>
-            <MudTh>@TypeColumnLabel</MudTh>
-            <MudTh>@RequiredLabel</MudTh>
-            <MudTh>@ActiveLabel</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="#">@context.Position</MudTd>
-            <MudTd DataLabel="@TextLabel">@((MarkupString)context.PromptText)</MudTd>
-            <MudTd DataLabel="@TypeColumnLabel">@TypeLabel(context)</MudTd>
-            <MudTd DataLabel="@RequiredLabel">@(context.IsRequired ? T["web.common.yes"] : T["web.common.no"])</MudTd>
-            <MudTd DataLabel="@ActiveLabel">@(context.IsActive ? T["web.common.yes"] : T["web.common.no"])</MudTd>
-            <MudTd>
-                <div class="row-actions">
-                    <form method="post" action="questions/@context.Id/move-up" class="inline">
-                        <AntiforgeryToken /><button type="submit" class="link" title="@T["web.questions.move_up"]">▲</button>
-                    </form>
-                    <form method="post" action="questions/@context.Id/move-down" class="inline">
-                        <AntiforgeryToken /><button type="submit" class="link" title="@T["web.questions.move_down"]">▼</button>
-                    </form>
-                    <a href="questions/@context.Id/edit">@T["web.questions.edit_link"]</a>
-                    @if (context.IsActive)
+    <MudDataGrid Items="_questions" Hover="true" Dense="true" SortMode="SortMode.Single">
+        <Columns>
+            <PropertyColumn Property="x => x.Position" Title="#" />
+            <PropertyColumn Property="x => x.PromptText" Title="@TextLabel">
+                <CellTemplate>@((MarkupString)context.Item.PromptText)</CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Sortable="false" Title="@TypeColumnLabel">
+                <CellTemplate>@TypeLabel(context.Item)</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Sortable="false" Title="@RequiredLabel">
+                <CellTemplate>@(context.Item.IsRequired ? T["web.common.yes"] : T["web.common.no"])</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Sortable="false" Title="@ActiveLabel">
+                <CellTemplate>@(context.Item.IsActive ? T["web.common.yes"] : T["web.common.no"])</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Sortable="false" Title="">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                   title="@T["web.questions.move_up"]" OnClick="@(() => MoveAsync(context.Item.Id, up: true))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                   title="@T["web.questions.move_down"]" OnClick="@(() => MoveAsync(context.Item.Id, up: false))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   title="@T["web.questions.edit_link"]" OnClick="@(() => OpenDialogAsync(context.Item.Id))" />
+                    @if (context.Item.IsActive)
                     {
-                        <form method="post" action="questions/@context.Id/deactivate" class="inline">
-                            <AntiforgeryToken /><button type="submit" class="link">@T["web.questions.hide_button"]</button>
-                        </form>
+                        <MudIconButton Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small"
+                                       title="@T["web.questions.hide_button"]" OnClick="@(() => DeactivateAsync(context.Item.Id))" />
                     }
-                </div>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="QuestionDto" />
+        </PagerContent>
+    </MudDataGrid>
 }
-
-<h2>@T["web.questions.add_title"]</h2>
-<form method="post" action="questions/create">
-    <AntiforgeryToken />
-    <RichTextEditor Name="promptText" />
-    <p class="muted">@T["web.questions.prompt_en_label"]</p>
-    <RichTextEditor Name="promptTextEn" Required="false" />
-    <label><input type="checkbox" name="isRequired" value="true" /> @T["web.questions.required_checkbox"]</label>
-    <QuestionTypeEditor Type="Text" />
-    <button type="submit" class="approve">@T["web.questions.add_button"]</button>
-</form>
 
 @code {
     private IReadOnlyList<QuestionDto>? _questions;
@@ -78,4 +75,26 @@ else
         "MultiChoice" => $"{T["web.qtype.multi_choice"]} ({q.Options?.Count ?? 0})",
         _ => T["web.qtype.text"],
     };
+
+    private async Task MoveAsync(long id, bool up)
+    {
+        await Api.MoveQuestionAsync(id, up);
+        _questions = await Api.GetQuestionsAsync();
+    }
+
+    private async Task DeactivateAsync(long id)
+    {
+        await Api.DeactivateQuestionAsync(id);
+        _questions = await Api.GetQuestionsAsync();
+    }
+
+    private async Task OpenDialogAsync(long? questionId)
+    {
+        var parameters = new DialogParameters<QuestionDialog> { { d => d.QuestionId, questionId } };
+        var title = questionId is null ? T["web.questions.add_title"] : T["web.questionedit.title"];
+        var dialog = await DialogService.ShowAsync<QuestionDialog>(title, parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            _questions = await Api.GetQuestionsAsync();
+    }
 }

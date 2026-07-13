@@ -1,0 +1,12 @@
+@* Shared icon+text brand mark — used in MainLayout's app bar (compact) and Login's card (larger).
+   No external logo asset exists for this app, so this is the one place the "Gatekeeper" identity
+   is defined; keep both call sites pointed at this instead of duplicating the icon/text pair. *@
+<div class="d-flex align-center gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Security" Size="@IconSize" Color="Color.Primary" />
+    <MudText Typo="@TextTypo" Class="font-weight-bold">Gatekeeper</MudText>
+</div>
+
+@code {
+    [Parameter] public Size IconSize { get; set; } = Size.Medium;
+    [Parameter] public Typo TextTypo { get; set; } = Typo.h6;
+}

@@ -11,7 +11,10 @@ namespace Gatekeeper.Tests;
 /// <summary>
 /// Integration tests for the /dashboard endpoint's UTC-bucketed aggregations. Query is intentionally
 /// duplicated from Endpoints.cs rather than extracted into a shared method, per project convention
-/// for read queries (see docs/conventions.md "Как добавить чтение (query)").
+/// for read queries (see docs/conventions.md "Как добавить чтение (query)"). The initial fetch is
+/// bounded by trendStart (14 days, feeds both the trend chart and the "this week" counts below) —
+/// approvedWeek/rejectedWeek/approvedToday/rejectedToday each apply their own narrower filter on top
+/// of that same in-memory list rather than issuing a second, differently-bounded query.
 /// </summary>
 [Collection("Postgres")]
 public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture)
@@ -26,7 +29,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         await using var db = await fixture.CreateTenantDbAsync();
 
         var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
-        var weekStart = todayStart.AddDays(-7);
+        var trendStart = todayStart.AddDays(-13);
 
         // Seed a decision exactly at todayStart
         var atBoundary = ModerationAction.ForDecision(
@@ -48,13 +51,14 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         // Execute the exact query from Endpoints.cs /dashboard — two-step pattern
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+            .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
         var approvedToday = decisions.Count(a => a.CreatedAt >= todayStart && a.Action == ModerationActionType.Approve);
 
-        // Assert: exactly 1 decision counts as "today" (the one at todayStart), but both are in the week range
+        // Assert: exactly 1 decision counts as "today" (the one at todayStart), but both are within
+        // the 14-day trend window.
         Assert.Equal(1, approvedToday);
         Assert.Equal(2, decisions.Count);
     }
@@ -66,6 +70,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
         var weekStart = todayStart.AddDays(-7);
+        var trendStart = todayStart.AddDays(-13);
 
         // Seed a decision exactly at weekStart (7 days before todayStart)
         var atWeekBoundary = ModerationAction.ForDecision(
@@ -74,7 +79,8 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
             performedByUserId: 500, performedByName: "Admin1", source: ActionSource.Web,
             now: weekStart);
 
-        // Seed a decision one millisecond before weekStart
+        // Seed a decision one millisecond before weekStart — still within the 14-day trend window,
+        // but must not count toward "this week".
         var beforeWeekBoundary = ModerationAction.ForDecision(
             telegramUserId: 2002, applicationId: 201, chatId: -999,
             action: ModerationActionType.Approve, reason: "Good application",
@@ -85,15 +91,17 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         db.ModerationActions.Add(beforeWeekBoundary);
         await db.SaveChangesAsync();
 
-        // Execute the first DB round-trip from Endpoints.cs /dashboard
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+            .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
-        // Assert: exactly 1 decision is in the week range (the one at weekStart), the one before is excluded
-        Assert.Single(decisions);
-        Assert.Equal(weekStart, decisions[0].CreatedAt);
+        var approvedWeek = decisions.Count(a => a.CreatedAt >= weekStart && a.Action == ModerationActionType.Approve);
+
+        // Both are in the wider 14-day fetch, but only the one at-or-after weekStart counts as
+        // "this week" — the one 1ms before is excluded from that narrower count.
+        Assert.Equal(2, decisions.Count);
+        Assert.Equal(1, approvedWeek);
     }
 
     [Fact]
@@ -102,7 +110,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         await using var db = await fixture.CreateTenantDbAsync();
 
         var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
-        var weekStart = todayStart.AddDays(-7);
+        var trendStart = todayStart.AddDays(-13);
 
         // Seed 2 approvals and 3 rejections all within "today"
         for (int i = 0; i < 2; i++)
@@ -127,9 +135,8 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         await db.SaveChangesAsync();
 
-        // Execute the exact query pattern from Endpoints.cs /dashboard
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+            .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
@@ -147,7 +154,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         await using var db = await fixture.CreateTenantDbAsync();
 
         var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
-        var weekStart = todayStart.AddDays(-7);
+        var trendStart = todayStart.AddDays(-13);
 
         var archived = ModerationAction.ForDecision(
             telegramUserId: 5001, applicationId: 500, chatId: -999,
@@ -168,7 +175,7 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
 
         // Weekly-count query from Endpoints.cs /dashboard
         var decisions = await db.ModerationActions.AsNoTracking()
-            .Where(a => a.CreatedAt >= weekStart && !a.IsArchived &&
+            .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
                 (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
             .ToListAsync();
 
@@ -271,5 +278,64 @@ public sealed class DashboardAggregationIntegrationTests(PostgresFixture fixture
         Assert.Equal(2, outboxPending);
         Assert.Equal(1, outboxInFlight);
         Assert.Equal(1, outboxFailed);
+    }
+
+    [Fact]
+    public async Task Trend_Has_Exactly_14_Ascending_Days_With_Zero_Activity_Gaps_Filled()
+    {
+        await using var db = await fixture.CreateTenantDbAsync();
+
+        var todayStart = new DateTimeOffset(TestNow.UtcDateTime.Date, TimeSpan.Zero);
+        var trendStart = todayStart.AddDays(-13);
+
+        // One approval today, one rejection 5 days ago — everything else in the 14-day window is
+        // deliberately left empty to prove the gap-fill behavior.
+        var todayApproval = ModerationAction.ForDecision(
+            telegramUserId: 6001, applicationId: 600, chatId: -999,
+            action: ModerationActionType.Approve, reason: "Good",
+            performedByUserId: 500, performedByName: "Admin1", source: ActionSource.Web,
+            now: todayStart.AddHours(3));
+        var fiveDaysAgoRejection = ModerationAction.ForDecision(
+            telegramUserId: 6002, applicationId: 601, chatId: -999,
+            action: ModerationActionType.Reject, reason: "Bad",
+            performedByUserId: 500, performedByName: "Admin1", source: ActionSource.Web,
+            now: todayStart.AddDays(-5).AddHours(3));
+
+        db.ModerationActions.Add(todayApproval);
+        db.ModerationActions.Add(fiveDaysAgoRejection);
+        await db.SaveChangesAsync();
+
+        var decisions = await db.ModerationActions.AsNoTracking()
+            .Where(a => a.CreatedAt >= trendStart && !a.IsArchived &&
+                (a.Action == ModerationActionType.Approve || a.Action == ModerationActionType.Reject))
+            .ToListAsync();
+
+        var trend = Enumerable.Range(0, 14)
+            .Select(i => trendStart.AddDays(i))
+            .Select(day => new
+            {
+                Day = DateOnly.FromDateTime(day.UtcDateTime),
+                Approved = decisions.Count(a => a.CreatedAt.UtcDateTime.Date == day.UtcDateTime.Date && a.Action == ModerationActionType.Approve),
+                Rejected = decisions.Count(a => a.CreatedAt.UtcDateTime.Date == day.UtcDateTime.Date && a.Action == ModerationActionType.Reject),
+            })
+            .ToList();
+
+        Assert.Equal(14, trend.Count);
+        Assert.Equal(trend.Select(t => t.Day).OrderBy(d => d), trend.Select(t => t.Day));   // ascending, oldest first
+        Assert.Equal(DateOnly.FromDateTime(trendStart.UtcDateTime), trend[0].Day);
+        Assert.Equal(DateOnly.FromDateTime(todayStart.UtcDateTime), trend[13].Day);
+
+        var todayPoint = trend[13];
+        Assert.Equal(1, todayPoint.Approved);
+        Assert.Equal(0, todayPoint.Rejected);
+
+        var fiveDaysAgoPoint = trend[8];   // trendStart + 8 days = todayStart - 5 days
+        Assert.Equal(0, fiveDaysAgoPoint.Approved);
+        Assert.Equal(1, fiveDaysAgoPoint.Rejected);
+
+        // Every other day has zero activity but still produced a (0, 0) point — no gaps.
+        var untouchedDays = trend.Where((_, i) => i != 13 && i != 8).ToList();
+        Assert.All(untouchedDays, t => Assert.Equal(0, t.Approved));
+        Assert.All(untouchedDays, t => Assert.Equal(0, t.Rejected));
     }
 }

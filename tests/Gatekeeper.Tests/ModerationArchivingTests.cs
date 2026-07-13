@@ -94,4 +94,49 @@ public class ModerationArchivingTests
             () => handler.HandleAsync(new UnarchiveModerationActionCommand(999)));
         Assert.Contains("not found", ex.Message);
     }
+
+    [Fact]
+    public async Task UnarchiveModerationActionsHandler_Restores_All_Given_Ids_With_One_SaveChanges()
+    {
+        var moderation = new FakeModerationRepository();
+        var unitOfWork = new FakeUnitOfWork();
+
+        var first = CreateDecision(TestNow.AddDays(-30), telegramUserId: 1);
+        first.Archive(TestNow);
+        moderation.Seed(first, id: 1);
+
+        var second = CreateDecision(TestNow.AddDays(-20), telegramUserId: 2);
+        second.Archive(TestNow);
+        moderation.Seed(second, id: 2);
+
+        // A third, untouched row makes sure the batch only affects the ids it was given.
+        var untouched = CreateDecision(TestNow.AddDays(-10), telegramUserId: 3);
+        untouched.Archive(TestNow);
+        moderation.Seed(untouched, id: 3);
+
+        var handler = new UnarchiveModerationActionsHandler(moderation, unitOfWork);
+        await handler.HandleAsync(new UnarchiveModerationActionsCommand([1, 2]));
+
+        Assert.False(first.IsArchived);
+        Assert.False(second.IsArchived);
+        Assert.True(untouched.IsArchived);
+        Assert.Equal(1, unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task UnarchiveModerationActionsHandler_Throws_When_Any_Id_Not_Found()
+    {
+        var moderation = new FakeModerationRepository();
+        var unitOfWork = new FakeUnitOfWork();
+
+        var first = CreateDecision(TestNow.AddDays(-30));
+        first.Archive(TestNow);
+        moderation.Seed(first, id: 1);
+
+        var handler = new UnarchiveModerationActionsHandler(moderation, unitOfWork);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync(new UnarchiveModerationActionsCommand([1, 999])));
+        Assert.Contains("not found", ex.Message);
+    }
 }

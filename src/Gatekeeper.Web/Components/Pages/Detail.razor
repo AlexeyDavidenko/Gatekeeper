@@ -1,7 +1,9 @@
 @page "/applications/{Id:long}"
 @attribute [Authorize]
+@using System.Security.Claims
 @inject AdminApiClient Api
 @inject Translator T
+@inject IDialogService DialogService
 
 <p><a href="/queue">@T["web.detail.back_to_queue"]</a></p>
 
@@ -54,25 +56,15 @@ else
     }
 
     <div class="moderation">
-        <h2>@T["web.detail.moderation_title"]</h2>
-        <form method="post" action="applications/@_card.Id/moderate" enctype="multipart/form-data">
-            <AntiforgeryToken />
-            <input type="hidden" name="telegramUserId" value="@_card.TelegramUserId" />
-            <input type="hidden" name="chatId" value="@_card.ChatId" />
-            <select name="action">
-                <option value="Ban">@T["web.detail.action_ban"]</option>
-                <option value="Mute">@T["web.detail.action_mute"]</option>
-                <option value="Kick">@T["web.detail.action_kick"]</option>
-                <option value="Warn">@T["web.detail.action_warn"]</option>
-            </select>
-            <input type="text" name="reason" placeholder="@ReasonPlaceholder" />
-            <input type="file" name="evidence" accept="image/*" />
-            <button type="submit" class="reject">@T["web.detail.apply_button"]</button>
-        </form>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Gavel"
+                   OnClick="OpenModerationDialogAsync">
+            @T["web.detail.moderation_title"]
+        </MudButton>
     </div>
 }
 
 @code {
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthStateTask { get; set; }
     [Parameter] public long Id { get; set; }
 
     private ApplicationCard? _card;
@@ -93,4 +85,23 @@ else
     };
 
     protected override async Task OnInitializedAsync() => _card = await Api.GetCardAsync(Id);
+
+    private async Task OpenModerationDialogAsync()
+    {
+        if (_card is null || AuthStateTask is null) return;
+        var user = (await AuthStateTask).User;
+        var actingUserId = long.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
+
+        var parameters = new DialogParameters<ModerationDialog>
+        {
+            { d => d.TelegramUserId, _card.TelegramUserId },
+            { d => d.ChatId, _card.ChatId },
+            { d => d.ActingUserId, actingUserId },
+            { d => d.ActingUserName, user.Identity?.Name },
+        };
+        var dialog = await DialogService.ShowAsync<ModerationDialog>(T["web.detail.moderation_title"], parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            _card = await Api.GetCardAsync(Id);
+    }
 }
