@@ -99,6 +99,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantChat> TenantChats => Set<TenantChat>();
+    public DbSet<Translation> Translations => Set<Translation>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -108,6 +109,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
             e.HasMany(t => t.Chats).WithOne().HasForeignKey(c => c.TenantId);
         });
         b.Entity<TenantChat>().HasIndex(c => c.ChatId);  // resolve tenant by incoming chat id
+        b.Entity<Translation>().HasIndex(t => new { t.Key, t.LanguageCode }).IsUnique();
         base.OnModelCreating(b);
     }
 }

@@ -10,4 +10,9 @@ public static class Lang
 {
     public static bool IsRussian(string? languageCode) =>
         languageCode?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>Collapses Telegram's full "language_code" range down to the two supported
+    /// translation-table language codes — the same "ru" wins, everything else falls back to "en"
+    /// rule IsRussian already encodes, just returning the TranslationCache lookup key instead of a bool.</summary>
+    public static string Resolve(string? languageCode) => IsRussian(languageCode) ? "ru" : "en";
 }

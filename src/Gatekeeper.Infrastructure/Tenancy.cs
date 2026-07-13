@@ -148,6 +148,20 @@ public sealed class TenantCatalogRepository(CatalogDbContext catalog) : ITenantC
     public Task SaveChangesAsync(CancellationToken ct = default) => catalog.SaveChangesAsync(ct);
 }
 
+public sealed class TranslationRepository(CatalogDbContext catalog) : ITranslationRepository
+{
+    public async Task<IReadOnlyList<Translation>> GetAllAsync(CancellationToken ct = default) =>
+        await catalog.Translations.AsNoTracking().ToListAsync(ct);
+
+    public Task<Translation?> GetAsync(string key, string languageCode, CancellationToken ct = default) =>
+        catalog.Translations.FirstOrDefaultAsync(t => t.Key == key && t.LanguageCode == languageCode, ct);
+
+    public async Task AddAsync(Translation translation, CancellationToken ct = default) =>
+        await catalog.Translations.AddAsync(translation, ct);
+
+    public Task SaveChangesAsync(CancellationToken ct = default) => catalog.SaveChangesAsync(ct);
+}
+
 /// <summary>
 /// Creates and migrates a brand-new tenant database. CREATE DATABASE / existence checks run
 /// against Postgres's own always-present "postgres" maintenance database.

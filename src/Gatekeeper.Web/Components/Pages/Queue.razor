@@ -1,16 +1,23 @@
 @page "/queue"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject NavigationManager Nav
+@inject Translator T
 
-<h1>Заявки на рассмотрении</h1>
+<h1>@T["web.queue.title"]</h1>
+
+@if (_notice == "conflict")
+{
+    <p class="error">@T["web.queue.notice_conflict"]</p>
+}
 
 @if (_apps is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else if (_apps.Count == 0)
 {
-    <p class="muted">Очередь пуста.</p>
+    <p class="muted">@T["web.queue.empty"]</p>
 }
 else
 {
@@ -18,22 +25,31 @@ else
         <HeaderContent>
             <MudTh>#</MudTh>
             <MudTh></MudTh>
-            <MudTh>Пользователь</MudTh>
-            <MudTh>Отправлена</MudTh>
+            <MudTh>@UserLabel</MudTh>
+            <MudTh>@SubmittedLabel</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="#">@context.Id</MudTd>
             <MudTd><Avatar PhotoFileId="@context.PhotoFileId" DisplayName="@context.DisplayName" Username="@context.Username" /></MudTd>
-            <MudTd DataLabel="Пользователь">@(context.DisplayName ?? "—") @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
-            <MudTd DataLabel="Отправлена"><LocalTime Value="context.SubmittedAt" /></MudTd>
-            <MudTd><a href="applications/@context.Id">Открыть</a></MudTd>
+            <MudTd DataLabel="@UserLabel">@(context.DisplayName ?? T["common.empty_dash"]) @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
+            <MudTd DataLabel="@SubmittedLabel"><LocalTime Value="context.SubmittedAt" /></MudTd>
+            <MudTd><a href="applications/@context.Id">@T["web.queue.open_link"]</a></MudTd>
         </RowTemplate>
     </MudTable>
 }
 
 @code {
     private IReadOnlyList<ApplicationSummary>? _apps;
+    private string? _notice;
 
-    protected override async Task OnInitializedAsync() => _apps = await Api.GetPendingAsync();
+    private string UserLabel => T["web.dashboard.user_column"];
+    private string SubmittedLabel => T["web.queue.submitted_column"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+        if (query.TryGetValue("notice", out var n)) _notice = n;
+        _apps = await Api.GetPendingAsync();
+    }
 }

@@ -1,23 +1,24 @@
 @page "/questions/{Id:long}/edit"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject Translator T
 
-<p><a href="/questions">← к вопросам</a></p>
+<p><a href="/questions">@T["web.questionedit.back_to_questions"]</a></p>
 
 @if (_question is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else
 {
-    <h1>Редактировать вопрос #@_question.Id</h1>
+    <h1>@T["web.questionedit.title"] #@_question.Id</h1>
     <form method="post" action="/questions/@_question.Id/save">
         <AntiforgeryToken />
         <RichTextEditor Name="promptText" Value="@_question.PromptText" />
-        <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> обязательный</label>
-        <label><input type="checkbox" name="isActive" value="true" checked="@_question.IsActive" /> активен (показывается в опросе)</label>
+        <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> @T["web.questions.required_checkbox"]</label>
+        <label><input type="checkbox" name="isActive" value="true" checked="@_question.IsActive" /> @T["web.questionedit.active_checkbox"]</label>
         <QuestionTypeEditor Type="@_question.Type" Options="@_question.Options" />
-        <button type="submit" class="approve">Сохранить</button>
+        <button type="submit" class="approve">@T["web.questionedit.save_button"]</button>
     </form>
 }
 

@@ -18,6 +18,7 @@ public sealed class CreateApplicationHandler(
     IUserRepository users,
     IApplicationRepository applications,
     IQuestionRepository questions,
+    ITranslationRepository translations,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
@@ -45,9 +46,12 @@ public sealed class CreateApplicationHandler(
         application.LinkIdentitySnapshot(snapshot.Id);
         await unitOfWork.SaveChangesAsync(ct);
  
-        return first is null
-            ? new FirstQuestion(null, "Welcome! There are no questions to answer yet.", nameof(QuestionType.Text), Completed: true)
-            : new FirstQuestion(first.Id, first.PromptText, first.Type.ToString(), Completed: false);
+        if (first is not null)
+            return new FirstQuestion(first.Id, first.PromptText, first.Type.ToString(), Completed: false);
+
+        var lang = Lang.Resolve(cmd.LanguageCode);
+        var noQuestions = await translations.GetValueAsync("bot.no_questions", lang, ct);
+        return new FirstQuestion(null, noQuestions, nameof(QuestionType.Text), Completed: true);
     }
  
     private static string Normalize(string? first, string? last) =>

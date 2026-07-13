@@ -41,6 +41,8 @@ builder.Services.AddScoped<ITelegramCommandQueue, TelegramCommandQueue>();
 builder.Services.AddScoped<ITenantDirectory, TenantDirectory>();
 builder.Services.AddScoped<TenantDbContextFactory>();        // cross-tenant outbox drain
 builder.Services.AddScoped<ITenantCatalogRepository, TenantCatalogRepository>();
+builder.Services.AddScoped<ITranslationRepository, TranslationRepository>();
+builder.Services.AddScoped<UpsertTranslationHandler>();
 builder.Services.AddScoped<ITenantProvisioner, TenantProvisioner>();
 builder.Services.AddScoped<ProvisionTenantHandler>();
 builder.Services.AddScoped<DecideApplicationHandler>();

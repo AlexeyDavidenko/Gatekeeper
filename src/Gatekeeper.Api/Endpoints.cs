@@ -707,6 +707,23 @@ public static class InternalEndpoints
             return Results.Ok(new ProvisionTenantResponse(result.TenantId, result.DatabaseName, result.WasCreated));
         });
 
+        // Catalog-level, not tenant-scoped — UI/bot text is identical across every tenant. Bot and
+        // Web each bulk-load this into their own periodically-refreshed cache (see TranslationCache
+        // in each project), never look it up per-message/per-render.
+        g.MapGet("/translations", async (ITranslationRepository translations, CancellationToken ct) =>
+        {
+            var all = await translations.GetAllAsync(ct);
+            return Results.Ok(all.Select(t => new TranslationDto(t.Id, t.Key, t.LanguageCode, t.Value)).ToList());
+        });
+
+        // Owner-only edit from the site's /translations page — upserts one (Key, LanguageCode) pair.
+        g.MapPut("/translations", async (
+            UpsertTranslationRequest body, UpsertTranslationHandler handler, CancellationToken ct) =>
+        {
+            await handler.HandleAsync(new UpsertTranslationCommand(body.Key, body.LanguageCode, body.Value), ct);
+            return Results.NoContent();
+        });
+
         return app;
     }
 

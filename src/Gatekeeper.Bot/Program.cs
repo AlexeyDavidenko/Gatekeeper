@@ -18,7 +18,9 @@ builder.Services.AddHttpClient<IGatekeeperApiClient, GatekeeperApiClient>(http =
 });
 
 builder.Services.AddSingleton<TenantRouter>();        // applicant→tenant map for DM survey routing
+builder.Services.AddSingleton<TranslationCache>();
 builder.Services.AddHostedService<TelegramUpdateWorker>();  // inbound: long polling
 builder.Services.AddHostedService<OutboxDrainWorker>();     // outbound: drains the transactional outbox
+builder.Services.AddHostedService<TranslationCacheRefreshWorker>();
 
 builder.Build().Run();

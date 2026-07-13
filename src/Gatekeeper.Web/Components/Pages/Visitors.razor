@@ -1,47 +1,57 @@
 @page "/visitors"
 @attribute [Authorize(Roles = "Owner")]
 @inject AdminApiClient Api
+@inject Translator T
 
-<h1>Посетители сайта</h1>
+<h1>@T["web.visitors.title"]</h1>
 
 @if (_visits is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else if (_visits.Count == 0)
 {
-    <p class="muted">Пока пусто.</p>
+    <p class="muted">@T["web.visitors.empty"]</p>
 }
 else
 {
     <MudTable Items="_visits" Hover="true" Dense="true">
         <HeaderContent>
-            <MudTh>Когда</MudTh>
-            <MudTh>Пользователь</MudTh>
-            <MudTh>IP</MudTh>
-            <MudTh>Путь</MudTh>
-            <MudTh>Метод</MudTh>
-            <MudTh>Статус</MudTh>
-            <MudTh>Мс</MudTh>
-            <MudTh>Откуда пришёл</MudTh>
+            <MudTh>@WhenLabel</MudTh>
+            <MudTh>@UserLabel</MudTh>
+            <MudTh>@IpLabel</MudTh>
+            <MudTh>@PathLabel</MudTh>
+            <MudTh>@MethodLabel</MudTh>
+            <MudTh>@StatusLabel</MudTh>
+            <MudTh>@MsLabel</MudTh>
+            <MudTh>@ReferrerLabel</MudTh>
             <MudTh>User-Agent</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
-            <MudTd DataLabel="Пользователь">@(context.UserName ?? (context.UserId?.ToString() ?? "—"))</MudTd>
-            <MudTd DataLabel="IP">@(context.IpAddress ?? "—")</MudTd>
-            <MudTd DataLabel="Путь">@context.Path</MudTd>
-            <MudTd DataLabel="Метод">@context.Method</MudTd>
-            <MudTd DataLabel="Статус">@context.StatusCode</MudTd>
-            <MudTd DataLabel="Мс">@context.DurationMs</MudTd>
-            <MudTd DataLabel="Откуда пришёл"><span class="truncate" title="@context.Referrer">@(context.Referrer ?? "—")</span></MudTd>
-            <MudTd DataLabel="User-Agent"><span class="truncate" title="@context.UserAgent">@(context.UserAgent ?? "—")</span></MudTd>
+            <MudTd DataLabel="@WhenLabel"><LocalTime Value="context.CreatedAt" /></MudTd>
+            <MudTd DataLabel="@UserLabel">@(context.UserName ?? (context.UserId?.ToString() ?? T["common.empty_dash"]))</MudTd>
+            <MudTd DataLabel="@IpLabel">@(context.IpAddress ?? T["common.empty_dash"])</MudTd>
+            <MudTd DataLabel="@PathLabel">@context.Path</MudTd>
+            <MudTd DataLabel="@MethodLabel">@context.Method</MudTd>
+            <MudTd DataLabel="@StatusLabel">@context.StatusCode</MudTd>
+            <MudTd DataLabel="@MsLabel">@context.DurationMs</MudTd>
+            <MudTd DataLabel="@ReferrerLabel"><span class="truncate" title="@context.Referrer">@(context.Referrer ?? T["common.empty_dash"])</span></MudTd>
+            <MudTd DataLabel="User-Agent"><span class="truncate" title="@context.UserAgent">@(context.UserAgent ?? T["common.empty_dash"])</span></MudTd>
         </RowTemplate>
     </MudTable>
 }
 
 @code {
     private IReadOnlyList<SiteVisitDto>? _visits;
+
+    private string WhenLabel => T["web.dashboard.when_column"];
+    private string UserLabel => T["web.dashboard.user_column"];
+    private string IpLabel => T["web.visitors.ip_column"];
+    private string PathLabel => T["web.visitors.path_column"];
+    private string MethodLabel => T["web.visitors.method_column"];
+    private string StatusLabel => T["web.visitors.status_column"];
+    private string MsLabel => T["web.visitors.ms_column"];
+    private string ReferrerLabel => T["web.visitors.referrer_column"];
 
     protected override async Task OnInitializedAsync() => _visits = await Api.GetSiteVisitsAsync();
 }

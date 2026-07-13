@@ -4,6 +4,8 @@
 @inject NavigationManager Nav
 @inject CircuitVisitContext VisitContext
 @inject SiteVisitQueue VisitQueue
+@inject LocaleContext Locale
+@inject Translator T
 
 <MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -16,23 +18,29 @@
         <MudText Typo="Typo.h6" Class="mr-4">Gatekeeper</MudText>
         <AuthorizeView>
             <Authorized>
-                <MudNavLink Href="/" Match="NavLinkMatch.All">Дашборд</MudNavLink>
-                <MudNavLink Href="/queue">Очередь</MudNavLink>
-                <MudNavLink Href="/history">История</MudNavLink>
-                <MudNavLink Href="/questions">Вопросы</MudNavLink>
+                <MudNavLink Href="/" Match="NavLinkMatch.All">@T["web.nav.dashboard"]</MudNavLink>
+                <MudNavLink Href="/queue">@T["web.nav.queue"]</MudNavLink>
+                <MudNavLink Href="/history">@T["web.nav.history"]</MudNavLink>
+                <MudNavLink Href="/questions">@T["web.nav.questions"]</MudNavLink>
                 <AuthorizeView Context="ownerContext" Roles="Owner">
                     <Authorized>
-                        <MudNavLink Href="/visitors">Посетители</MudNavLink>
+                        <MudNavLink Href="/visitors">@T["web.nav.visitors"]</MudNavLink>
+                        <MudNavLink Href="/translations">@T["web.nav.translations"]</MudNavLink>
                     </Authorized>
                 </AuthorizeView>
                 <MudSpacer />
                 <span class="user">@context.User.Identity?.Name</span>
                 <form method="post" action="auth/logout" class="inline">
                     <AntiforgeryToken />
-                    <button type="submit" class="link">Выйти</button>
+                    <button type="submit" class="link">@T["web.nav.logout"]</button>
                 </form>
             </Authorized>
         </AuthorizeView>
+        <span class="lang-switch">
+            <a href="@LangUrl("ru")" class="@(Locale.LanguageCode == "ru" ? "active" : null)">RU</a>
+            /
+            <a href="@LangUrl("en")" class="@(Locale.LanguageCode == "en" ? "active" : null)">EN</a>
+        </span>
     </MudAppBar>
     <main>
         @Body
@@ -77,6 +85,8 @@
         var cut = relative.IndexOfAny(['?', '#']);
         return "/" + (cut >= 0 ? relative[..cut] : relative);
     }
+
+    private string LangUrl(string code) => $"lang/{code}?returnUrl={Uri.EscapeDataString(CurrentPath())}";
 
     // OS dark-mode preference is read once per circuit at startup — matches the existing plain-CSS
     // pages, which also only ever apply prefers-color-scheme at load, never live-react mid-session.

@@ -1,5 +1,6 @@
+@inject LocaleContext Locale
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="@Locale.LanguageCode">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -81,6 +82,13 @@
         .q-option-row { display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
         .q-option-row input[type=text] { flex: 1; }
         .widget { max-width: 100%; overflow-x: auto; }
+        .lang-switch { margin-left: .75rem; font-size: .9rem; opacity: .7; }
+        .lang-switch a { text-decoration: none; }
+        .lang-switch a.active { font-weight: 700; opacity: 1; text-decoration: underline; }
+        .translation-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: .4rem 0; }
+        .translation-row .translation-key { flex-basis: 220px; opacity: .7; font-size: .85rem; }
+        .translation-row label { display: flex; gap: .35rem; align-items: center; font-size: .85rem; }
+        .translation-row input[type=text] { min-width: 220px; flex: 1; }
         button:focus-visible, a:focus-visible, input:focus-visible, [contenteditable]:focus-visible {
             outline: 2px solid var(--focus); outline-offset: 2px;
         }

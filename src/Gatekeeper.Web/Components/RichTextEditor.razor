@@ -3,15 +3,16 @@
    single-line, so Enter is suppressed client-side (see richtext.js) rather than dealing with
    <div>/<br> vs literal "\n" conversion for something this short. *@
 @inject IJSRuntime JS
+@inject Translator T
 
 <div class="rte" @ref="_wrapper">
     <div class="rte-toolbar">
-        <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
-        <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
-        <button type="button" data-cmd="underline" title="Подчёркнутый"><u>Ч</u></button>
-        <button type="button" data-cmd="strikeThrough" title="Зачёркнутый"><s>З</s></button>
-        <button type="button" data-cmd="code" title="Моноширинный текст">&lt;/&gt;</button>
-        <button type="button" data-cmd="link" title="Ссылка">🔗</button>
+        <button type="button" data-cmd="bold" title="@T["web.rte.bold"]"><b>@T["web.rte.bold_glyph"]</b></button>
+        <button type="button" data-cmd="italic" title="@T["web.rte.italic"]"><i>@T["web.rte.italic_glyph"]</i></button>
+        <button type="button" data-cmd="underline" title="@T["web.rte.underline"]"><u>@T["web.rte.underline_glyph"]</u></button>
+        <button type="button" data-cmd="strikeThrough" title="@T["web.rte.strikethrough"]"><s>@T["web.rte.strikethrough_glyph"]</s></button>
+        <button type="button" data-cmd="code" title="@T["web.rte.code"]">&lt;/&gt;</button>
+        <button type="button" data-cmd="link" title="@T["web.rte.link"]">🔗</button>
     </div>
     <div class="rte-editor" contenteditable="true" id="@_id" data-required="@(Required ? "true" : null)">@((MarkupString)(Value ?? ""))</div>
     <input type="hidden" name="@Name" id="@(_id)-input" value="@Value" />

@@ -52,6 +52,23 @@ public static class WebEndpoints
             return Results.Redirect("/login");
         });
 
+        // Language switcher: a real HTTP redirect (not an in-circuit navigation) so the next page
+        // load always starts a fresh Blazor circuit — see LocaleContext's doc comment for why that
+        // matters. "returnUrl" defaults to "/" and is never trusted as an absolute/external URL.
+        app.MapGet("/lang/{code}", (string code, string? returnUrl, HttpContext ctx) =>
+        {
+            ctx.Response.Cookies.Append("gk_lang", code is "en" ? "en" : "ru", new CookieOptions
+            {
+                HttpOnly = false,   // read by no JS today, but harmless to allow and matches a future theme-style toggle
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTimeOffset.UtcNow.AddYears(1),
+                IsEssential = true,
+            });
+            var target = returnUrl is { Length: > 0 } && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") ? returnUrl : "/";
+            return Results.Redirect(target);
+        });
+
         // Avatar proxy: PhotoFileId is a Telegram-internal file_id, not a browser-usable URL —
         // resolve it (getFile) and stream the bytes through, using the bot token server-side.
         // Cached client-side since profile photos rarely change and a fresh getFile is a live API call.
@@ -157,6 +174,27 @@ public static class WebEndpoints
             await api.UnarchiveModerationActionAsync(id, ct);
             return Results.Redirect("/history?includeArchived=true");
         });
+
+        // /translations editor (Owner-only, enforced by the page itself — this form post shares its
+        // route prefix but the antiforgery+auth cookie already gates it the same way). Refreshes
+        // this Web instance's own TranslationCache immediately so the editor's next load reflects
+        // the change right away — other running Bot/Web processes pick it up on their own next
+        // periodic refresh (60s), an accepted small lag, same tradeoff as everywhere else this
+        // migration uses a periodically-refreshed cache.
+        app.MapGroup("/translations").RequireAuthorization(policy => policy.RequireRole("Owner"))
+            .MapPost("/save", async (HttpContext ctx, AdminApiClient api, TranslationCache cache, IAntiforgery af, CancellationToken ct) =>
+            {
+                await ValidateAsync(af, ctx);
+                var form = await ctx.Request.ReadFormAsync(ct);
+                var key = form["key"].ToString();
+                if (string.IsNullOrWhiteSpace(key)) return Results.BadRequest("Missing key.");
+
+                await api.UpdateTranslationAsync(key, "ru", form["ru"].ToString(), ct);
+                await api.UpdateTranslationAsync(key, "en", form["en"].ToString(), ct);
+                cache.Load(await api.GetTranslationsAsync(ct));
+
+                return Results.Redirect("/translations");
+            });
 
         return app;
     }

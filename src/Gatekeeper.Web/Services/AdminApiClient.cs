@@ -168,6 +168,26 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
         res.EnsureSuccessStatusCode();
     }
 
+    // /internal/* — Catalog-level, tenant-agnostic (see TranslationDto). The X-Tenant-Id header
+    // Get()/Post() always attach is simply ignored by the Api's TenantContextMiddleware for any
+    // "/internal" path, so reusing those helpers here is harmless.
+    public async Task<IReadOnlyList<TranslationDto>> GetTranslationsAsync(CancellationToken ct = default)
+    {
+        using var res = await http.SendAsync(Get("/internal/translations"), ct);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<TranslationDto>>(ct) ?? [];
+    }
+
+    public async Task UpdateTranslationAsync(string key, string languageCode, string value, CancellationToken ct = default)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Put, "/internal/translations")
+        {
+            Content = JsonContent.Create(new UpsertTranslationRequest(key, languageCode, value)),
+        };
+        using var res = await http.SendAsync(msg, ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     private HttpRequestMessage Get(string path) =>
         new(HttpMethod.Get, path) { Headers = { { "X-Tenant-Id", TenantId.ToString() } } };
 

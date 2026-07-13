@@ -15,27 +15,23 @@ public sealed class TelegramUpdateWorker(
     ITelegramBotClient bot,
     IGatekeeperApiClient api,
     TenantRouter router,
+    TranslationCache tr,
     ILogger<TelegramUpdateWorker> log) : BackgroundService
 {
     // Only these two are supported — Telegram's own language_code covers dozens, anything not
-    // Russian falls back to English. Applies only to the bot's own generated text (greeting,
-    // thank-you, decision DM) — question prompts stay whatever the admin typed, unlocalized.
+    // Russian falls back to English. Applies to every bit of bot-generated text (greeting,
+    // thank-you, decision DM, admin-group command replies) — question prompts stay whatever the
+    // admin typed, unlocalized.
     private static bool IsRussian(string? languageCode) =>
         languageCode?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
 
-    private static string WelcomeMessage(bool ru) => ru
-        ? "👋 Добро пожаловать! Пожалуйста, ответьте на несколько вопросов, чтобы подать заявку.\n\nХотите сменить язык переписки?"
-        : "👋 Welcome! Please answer a few quick questions to complete your application.\n\nWould you like to switch the language?";
+    private static string Lang(string? languageCode) => IsRussian(languageCode) ? "ru" : "en";
 
-    private static string ThankYouMessage(bool ru) => ru
-        ? "🙏 Спасибо за ответы! Ваша заявка принята и будет рассмотрена в ближайшее время."
-        : "🙏 Thank you for your answers! Your application has been received and will be reviewed shortly.";
-
-    private static InlineKeyboardMarkup LanguageOfferKeyboard(bool ru) => new(
+    private InlineKeyboardMarkup LanguageOfferKeyboard(string lang) => new(
     [
         [
-            InlineKeyboardButton.WithCallbackData(ru ? "🌐 Сменить язык" : "🌐 Change language", "lang:switch"),
-            InlineKeyboardButton.WithCallbackData(ru ? "▶️ Продолжить" : "▶️ Continue", "lang:go"),
+            InlineKeyboardButton.WithCallbackData(tr.Get("bot.lang.switch_button", lang), "lang:switch"),
+            InlineKeyboardButton.WithCallbackData(tr.Get("bot.lang.continue_button", lang), "lang:go"),
         ],
     ]);
 
@@ -43,14 +39,14 @@ public sealed class TelegramUpdateWorker(
     // get back to continuing in their already-detected language, instead of being forced to pick
     // ru/en explicitly — reuses the existing "lang:go" action, same as the "▶️ Продолжить" button
     // on the offer keyboard one step earlier.
-    private static InlineKeyboardMarkup LanguagePickerKeyboard(bool ru) => new(
+    private InlineKeyboardMarkup LanguagePickerKeyboard(string lang) => new(
     [
         [
-            InlineKeyboardButton.WithCallbackData("🇷🇺 Русский", "lang:ru"),
-            InlineKeyboardButton.WithCallbackData("🇬🇧 English", "lang:en"),
+            InlineKeyboardButton.WithCallbackData(tr.Get("bot.lang.ru_button", lang), "lang:ru"),
+            InlineKeyboardButton.WithCallbackData(tr.Get("bot.lang.en_button", lang), "lang:en"),
         ],
         [
-            InlineKeyboardButton.WithCallbackData(ru ? "◀️ Назад" : "◀️ Back", "lang:go"),
+            InlineKeyboardButton.WithCallbackData(tr.Get("bot.lang.back_button", lang), "lang:go"),
         ],
     ]);
 
@@ -61,7 +57,7 @@ public sealed class TelegramUpdateWorker(
     // Each row toggles its own bit in an int bitmask carried in its own callback data (no bot- or
     // server-side state needed between taps — the same trick already used for the admin card's
     // show/hide-answers toggle, just extended to N options instead of one). A final row submits.
-    private static InlineKeyboardMarkup MultiChoiceKeyboard(long questionId, IReadOnlyList<string> options, int mask)
+    private InlineKeyboardMarkup MultiChoiceKeyboard(long questionId, IReadOnlyList<string> options, int mask, string lang)
     {
         var rows = new List<IEnumerable<InlineKeyboardButton>>();
         for (var i = 0; i < options.Count; i++)
@@ -70,7 +66,7 @@ public sealed class TelegramUpdateWorker(
             var label = (isChecked ? "☑ " : "☐ ") + options[i];
             rows.Add([InlineKeyboardButton.WithCallbackData(label, $"mc:{questionId}:{mask}:{i}")]);
         }
-        rows.Add([InlineKeyboardButton.WithCallbackData("✅ Готово / Done", $"mcdone:{questionId}:{mask}")]);
+        rows.Add([InlineKeyboardButton.WithCallbackData(tr.Get("bot.mc.done_button", lang), $"mcdone:{questionId}:{mask}")]);
         return new InlineKeyboardMarkup(rows);
     }
 
@@ -141,8 +137,8 @@ public sealed class TelegramUpdateWorker(
                     // Greet + offer a language switch; the first question is sent only once the user
                     // resolves this (via the "lang:*" callback below), not from here — so it can be
                     // sent in whichever language they end up choosing.
-                    var ru = IsRussian(jr.From.LanguageCode);
-                    await bot.SendMessage(jr.From.Id, WelcomeMessage(ru), replyMarkup: LanguageOfferKeyboard(ru), cancellationToken: ct);
+                    var lang = Lang(jr.From.LanguageCode);
+                    await bot.SendMessage(jr.From.Id, tr.Get("bot.welcome", lang), replyMarkup: LanguageOfferKeyboard(lang), cancellationToken: ct);
                 }
                 else if (first.Prompt is not null)
                 {
@@ -157,12 +153,10 @@ public sealed class TelegramUpdateWorker(
             // "/start"/"/status" mid-survey never gets misread as an answer to the current question.
             case { Message: { Chat.Type: ChatType.Private, From: { } from, Text: { } text } msg } when CommandOf(text) == "/start":
             {
-                var ru = IsRussian(from.LanguageCode);
+                var lang = Lang(from.LanguageCode);
                 var reply = await ResolveApplicantTenantAsync(from.Id, ct) is not null
-                    ? (ru ? "У вас уже есть заявка в процессе — просто ответьте на вопрос выше." : "You already have an application in progress — just answer the question above.")
-                    : (ru
-                        ? "👋 Привет! Чтобы подать заявку, отправьте запрос на вступление в группу — я пришлю анкету сюда, в личные сообщения."
-                        : "👋 Hi! To apply, send a join request to the group — I'll DM you a short questionnaire here.");
+                    ? tr.Get("bot.start.in_progress", lang)
+                    : tr.Get("bot.start.greeting", lang);
                 await bot.SendMessage(from.Id, reply, cancellationToken: ct);
                 break;
             }
@@ -170,7 +164,7 @@ public sealed class TelegramUpdateWorker(
             case { Message: { Chat.Type: ChatType.Private, From: { } from } msg } when CommandOf(msg.Text ?? "") == "/status":
             {
                 var status = await api.GetLatestApplicationStatusAsync(from.Id, ct);
-                await bot.SendMessage(from.Id, FormatStatus(status, IsRussian(from.LanguageCode)), cancellationToken: ct);
+                await bot.SendMessage(from.Id, FormatStatus(status, Lang(from.LanguageCode)), cancellationToken: ct);
                 break;
             }
 
@@ -184,10 +178,7 @@ public sealed class TelegramUpdateWorker(
                     // actually started yet, so this isn't a real answer. Remind them instead of
                     // silently swallowing it (see StartSurveyHandler for why this can no longer
                     // silently start the survey).
-                    var ru = IsRussian(from.LanguageCode);
-                    await bot.SendMessage(from.Id, ru
-                        ? "Пожалуйста, сначала нажмите одну из кнопок выше, чтобы начать анкету."
-                        : "Please tap one of the buttons above first to start the questionnaire.", cancellationToken: ct);
+                    await bot.SendMessage(from.Id, tr.Get("bot.stray_text_reminder", Lang(from.LanguageCode)), cancellationToken: ct);
                     break;
                 }
                 await AdvanceAsync(from.Id, next, ct);
@@ -196,35 +187,39 @@ public sealed class TelegramUpdateWorker(
 
             // Admin-group commands. Only the admin group (Role == "AdminGroup") gets a reply — the
             // same bot can also sit in the main group, which resolves to a tenant too but must not
-            // leak queue/stats data if someone types these there.
-            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/stats":
+            // leak queue/stats data if someone types these there. Language resolves per-message from
+            // the acting admin's own Telegram client (no persisted preference needed here, unlike
+            // applicant DMs — every reply is a direct response to whoever just typed the command).
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, From: { } from, Text: { } text } msg } when CommandOf(text) == "/stats":
             {
                 if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
                 {
                     var summary = await api.GetDashboardAsync(tenantId, ct);
-                    await bot.SendMessage(msg.Chat.Id, FormatStats(summary), cancellationToken: ct);
+                    await bot.SendMessage(msg.Chat.Id, FormatStats(summary, Lang(from.LanguageCode)), cancellationToken: ct);
                 }
                 break;
             }
 
-            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/pending":
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, From: { } from, Text: { } text } msg } when CommandOf(text) == "/pending":
             {
                 if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
                 {
+                    var lang = Lang(from.LanguageCode);
                     var pending = await api.GetApplicationsByStatusAsync(tenantId, "AwaitingReview", ct);
-                    await bot.SendMessage(msg.Chat.Id, FormatApplicationList(pending, "Нет заявок на рассмотрении."), cancellationToken: ct);
+                    await bot.SendMessage(msg.Chat.Id, FormatApplicationList(pending, tr.Get("bot.admin.pending_empty", lang), lang), cancellationToken: ct);
                 }
                 break;
             }
 
-            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, Text: { } text } msg } when CommandOf(text) == "/find":
+            case { Message: { Chat.Type: ChatType.Group or ChatType.Supergroup, From: { } from, Text: { } text } msg } when CommandOf(text) == "/find":
             {
                 if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
                 {
+                    var lang = Lang(from.LanguageCode);
                     var query = ArgumentOf(text);
                     var reply = string.IsNullOrWhiteSpace(query)
-                        ? "Использование: /find <имя или username>"
-                        : FormatApplicationList(await api.SearchApplicationsAsync(tenantId, query, ct), "Ничего не найдено.");
+                        ? tr.Get("bot.admin.find_usage", lang)
+                        : FormatApplicationList(await api.SearchApplicationsAsync(tenantId, query, ct), tr.Get("bot.admin.find_empty", lang), lang);
                     await bot.SendMessage(msg.Chat.Id, reply, cancellationToken: ct);
                 }
                 break;
@@ -241,17 +236,18 @@ public sealed class TelegramUpdateWorker(
             {
                 if (await ResolveAdminGroupAsync(msg.Chat.Id, ct) is { } tenantId)
                 {
+                    var lang = Lang(from.LanguageCode);
                     string reply;
                     if (long.TryParse(ArgumentOf(text), out var applicationId))
                     {
                         var actingName = $"{from.FirstName} {from.LastName}".Trim();
                         await api.CancelApplicationAsync(tenantId, applicationId,
                             new CancelApplicationRequest(from.Id, actingName), ct);
-                        reply = "Заявка отменена.";
+                        reply = tr.Get("bot.admin.cancel_success", lang);
                     }
                     else
                     {
-                        reply = "Использование: /cancel <id заявки> (id виден в /find или /pending)";
+                        reply = tr.Get("bot.admin.cancel_usage", lang);
                     }
                     await bot.SendMessage(msg.Chat.Id, reply, cancellationToken: ct);
                 }
@@ -270,7 +266,7 @@ public sealed class TelegramUpdateWorker(
                     {
                         case "switch":
                             await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId,
-                                LanguagePickerKeyboard(IsRussian(cb.From.LanguageCode)), cancellationToken: ct);
+                                LanguagePickerKeyboard(Lang(cb.From.LanguageCode)), cancellationToken: ct);
                             break;
                         case "go":
                             await SendFirstQuestionAsync(tenantId, cb.From.Id, ct);
@@ -314,7 +310,7 @@ public sealed class TelegramUpdateWorker(
                 var options = kb.Take(kb.Count() - 1)   // last row is the Done button, not an option
                     .Select(row => StripCheckbox(row.First().Text)).ToList();
                 await bot.EditMessageReplyMarkup(cb.From.Id, m.MessageId,
-                    MultiChoiceKeyboard(questionId, options, newMask), cancellationToken: ct);
+                    MultiChoiceKeyboard(questionId, options, newMask, Lang(cb.From.LanguageCode)), cancellationToken: ct);
                 await bot.AnswerCallbackQuery(cb.Id, cancellationToken: ct);
                 break;
             }
@@ -376,11 +372,11 @@ public sealed class TelegramUpdateWorker(
         if (next.Completed)
         {
             router.Forget(userId);
-            await bot.SendMessage(userId, ThankYouMessage(IsRussian(next.LanguageCode)), cancellationToken: ct);
+            await bot.SendMessage(userId, tr.Get("bot.thankyou", Lang(next.LanguageCode)), cancellationToken: ct);
         }
         else if (next.Prompt is not null)
         {
-            await SendQuestionAsync(userId, next.QuestionId!.Value, next.Prompt, next.Type, next.Options, ct);
+            await SendQuestionAsync(userId, next.QuestionId!.Value, next.Prompt, next.Type, next.Options, Lang(next.LanguageCode), ct);
         }
     }
 
@@ -388,12 +384,12 @@ public sealed class TelegramUpdateWorker(
     // Gatekeeper.Web) — ParseMode.Html renders the same bold/italic/links seen on the site.
     // SingleChoice/MultiChoice questions get an inline keyboard instead of a "type your answer" prompt.
     private async Task SendQuestionAsync(
-        long userId, long questionId, string promptText, string type, IReadOnlyList<string>? options, CancellationToken ct)
+        long userId, long questionId, string promptText, string type, IReadOnlyList<string>? options, string lang, CancellationToken ct)
     {
         InlineKeyboardMarkup? keyboard = (type, options) switch
         {
             ("SingleChoice", { Count: > 0 } opts) => SingleChoiceKeyboard(questionId, opts),
-            ("MultiChoice", { Count: > 0 } opts) => MultiChoiceKeyboard(questionId, opts, mask: 0),
+            ("MultiChoice", { Count: > 0 } opts) => MultiChoiceKeyboard(questionId, opts, mask: 0, lang),
             _ => null,
         };
         await bot.SendMessage(userId, promptText, parseMode: ParseMode.Html, replyMarkup: keyboard, cancellationToken: ct);
@@ -418,31 +414,34 @@ public sealed class TelegramUpdateWorker(
         return tenant is { Role: "AdminGroup" } ? tenant.Value.TenantId : null;
     }
 
-    private static string FormatStatus(LatestApplicationStatusDto? status, bool ru)
+    private string FormatStatus(LatestApplicationStatusDto? status, string lang)
     {
-        if (status is null) return ru ? "У вас пока нет заявок." : "You don't have any applications yet.";
+        if (status is null) return tr.Get("bot.status.none", lang);
         return status.Status switch
         {
-            "Approved" => ru ? "✅ Ваша заявка одобрена." : "✅ Your application was approved.",
-            "Rejected" => ru ? "❌ Ваша заявка отклонена." : "❌ Your application was declined.",
-            "AwaitingReview" => ru ? "⏳ Ваша заявка на рассмотрении." : "⏳ Your application is awaiting review.",
-            _ => ru ? "📝 Вы ещё проходите анкету." : "📝 You're still completing the questionnaire.",
+            "Approved" => tr.Get("bot.status.approved", lang),
+            "Rejected" => tr.Get("bot.status.rejected", lang),
+            "AwaitingReview" => tr.Get("bot.status.awaiting_review", lang),
+            _ => tr.Get("bot.status.in_survey", lang),
         };
     }
 
-    private static string FormatStats(DashboardSummary s) =>
-        $"📊 Статистика\n" +
-        $"Ожидают: {s.PendingCount}\n" +
-        $"Сегодня: ✅ {s.ApprovedToday} / ❌ {s.RejectedToday}\n" +
-        $"За неделю: ✅ {s.ApprovedWeek} / ❌ {s.RejectedWeek}\n" +
-        $"Outbox: в очереди {s.OutboxPending}, в работе {s.OutboxInFlight}, ошибок {s.OutboxFailed}";
+    private string FormatStats(DashboardSummary s, string lang) =>
+        $"{tr.Get("bot.admin.stats_title", lang)}\n" +
+        $"{tr.Get("bot.admin.stats_pending", lang)}: {s.PendingCount}\n" +
+        $"{tr.Get("bot.admin.stats_today", lang)}: ✅ {s.ApprovedToday} / ❌ {s.RejectedToday}\n" +
+        $"{tr.Get("bot.admin.stats_week", lang)}: ✅ {s.ApprovedWeek} / ❌ {s.RejectedWeek}\n" +
+        $"Outbox: {tr.Get("bot.admin.stats_outbox_pending", lang)} {s.OutboxPending}, " +
+        $"{tr.Get("bot.admin.stats_outbox_inflight", lang)} {s.OutboxInFlight}, " +
+        $"{tr.Get("bot.admin.stats_outbox_failed", lang)} {s.OutboxFailed}";
 
-    private static string FormatApplicationList(IReadOnlyList<ApplicationSummary> apps, string emptyText)
+    private string FormatApplicationList(IReadOnlyList<ApplicationSummary> apps, string emptyText, string lang)
     {
         if (apps.Count == 0) return emptyText;
+        var dash = tr.Get("common.empty_dash", lang);
         var lines = apps.Select(a =>
         {
-            var name = a.DisplayName ?? "—";
+            var name = a.DisplayName ?? dash;
             var username = a.Username is null ? "" : $" (@{a.Username})";
             return $"#{a.Id} {name}{username} — {a.Status}";
         });

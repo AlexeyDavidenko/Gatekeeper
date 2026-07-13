@@ -107,6 +107,13 @@ public sealed record CommandResult(bool Success, string? Error, long? MessageId 
 /// rehydrate the bot's in-memory TenantRouter after a restart.</summary>
 public sealed record InProgressApplicant(long TenantId, long TelegramUserId);
 
+/// <summary>One localized string. Catalog-level (not tenant-scoped) — Bot and Web each bulk-load
+/// every row via GET /internal/translations into their own periodically-refreshed in-memory cache,
+/// rather than looking up per-message/per-render.</summary>
+public sealed record TranslationDto(long Id, string Key, string LanguageCode, string Value);
+
+public sealed record UpsertTranslationRequest(string Key, string LanguageCode, string Value);
+
 /// <summary>The only surface Bot and Web use to reach data — they never touch the database.</summary>
 public interface IGatekeeperApiClient
 {
@@ -125,6 +132,10 @@ public interface IGatekeeperApiClient
     Task<IReadOnlyList<PendingCommand>> GetPendingTelegramCommandsAsync(int batch, CancellationToken ct = default);
     Task AckTelegramCommandAsync(long tenantId, long commandId, CommandResult result, CancellationToken ct = default);
     Task<IReadOnlyList<InProgressApplicant>> GetInProgressApplicantsAsync(CancellationToken ct = default);
+
+    // Catalog-level, not tenant-scoped — see TranslationDto. Bulk-loaded periodically into an
+    // in-memory cache, never looked up per-message.
+    Task<IReadOnlyList<TranslationDto>> GetTranslationsAsync(CancellationToken ct = default);
 
     // Bot-side language picker: persisting an explicit language choice so later messages —
     // including ones sent by a different process, like a decision made from the website — pick it up.

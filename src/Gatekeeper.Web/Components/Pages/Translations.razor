@@ -1,0 +1,63 @@
+@page "/translations"
+@attribute [Authorize(Roles = "Owner")]
+@inject AdminApiClient Api
+@inject Translator T
+
+<h1>@T["web.translations.title"]</h1>
+<p class="muted">@T["web.translations.subtitle"]</p>
+
+@if (_groups is null)
+{
+    <p>@T["web.common.loading"]</p>
+}
+else
+{
+    <MudExpansionPanels>
+        @foreach (var group in _groups)
+        {
+            <MudExpansionPanel Text="@group.Prefix">
+                @foreach (var row in group.Rows)
+                {
+                    <form method="post" action="translations/save" class="translation-row">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="key" value="@row.Key" />
+                        <code class="translation-key">@row.Key</code>
+                        <label>RU
+                            <input type="text" name="ru" value="@row.Ru" />
+                        </label>
+                        <label>EN
+                            <input type="text" name="en" value="@row.En" />
+                        </label>
+                        <button type="submit" class="link">@T["web.translations.save_button"]</button>
+                    </form>
+                }
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+}
+
+@code {
+    private sealed record Row(string Key, string? Ru, string? En);
+    private sealed record Group(string Prefix, List<Row> Rows);
+
+    private List<Group>? _groups;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await Api.GetTranslationsAsync();
+        var byKey = all.GroupBy(t => t.Key)
+            .Select(g => new Row(
+                g.Key,
+                g.FirstOrDefault(t => t.LanguageCode == "ru")?.Value,
+                g.FirstOrDefault(t => t.LanguageCode == "en")?.Value))
+            .OrderBy(r => r.Key, StringComparer.Ordinal);
+
+        // Group by the first two dot segments — matches this migration's own key-naming
+        // convention (surface + page/concern), e.g. "bot.admin.stats_title" -> "bot.admin".
+        _groups = byKey
+            .GroupBy(r => string.Join('.', r.Key.Split('.').Take(2)))
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => new Group(g.Key, g.ToList()))
+            .ToList();
+    }
+}

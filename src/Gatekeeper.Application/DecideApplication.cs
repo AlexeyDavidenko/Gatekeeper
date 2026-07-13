@@ -27,6 +27,7 @@ public sealed class DecideApplicationHandler(
     ITenantDirectory directory,
     ITenantContext tenant,
     IUserRepository users,
+    ITranslationRepository translations,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
@@ -61,10 +62,9 @@ public sealed class DecideApplicationHandler(
             JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.MainChatId, UserId: application.TelegramUserId)),
             application.Id, application.TelegramUserId, now));
 
-        var isRu = Lang.IsRussian(user?.LanguageCode);
-        var verdictDm = cmd.Approve
-            ? (isRu ? "✅ Ваша заявка одобрена, добро пожаловать!" : "✅ Your application has been approved, welcome!")
-            : (isRu ? "❌ Ваша заявка отклонена." : "❌ Your application was declined.");
+        var lang = Lang.Resolve(user?.LanguageCode);
+        var verdictDm = await translations.GetValueAsync(
+            cmd.Approve ? "bot.decision.approved" : "bot.decision.rejected", lang, ct);
         queue.Enqueue(TelegramCommand.Enqueue(
             TelegramCommandType.SendMessage,
             JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.TelegramUserId, Text: verdictDm)),

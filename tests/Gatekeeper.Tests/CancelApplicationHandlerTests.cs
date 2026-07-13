@@ -29,6 +29,7 @@ public class CancelApplicationHandlerTests
         FakeModerationRepository? moderation = null,
         FakeTelegramCommandQueue? queue = null,
         FakeUserRepository? users = null,
+        FakeTranslationRepository? translations = null,
         FakeUnitOfWork? unitOfWork = null,
         FakeClock? clock = null)
     {
@@ -36,10 +37,21 @@ public class CancelApplicationHandlerTests
         moderation ??= new();
         queue ??= new();
         users ??= new();
+        translations ??= SeededTranslations();
         unitOfWork ??= new();
         clock ??= new(TestNow);
 
-        return new(apps, moderation, queue, users, unitOfWork, clock);
+        return new(apps, moderation, queue, users, translations, unitOfWork, clock);
+    }
+
+    /// <summary>Seeds just the decision-DM key this test suite asserts on — full seed data lives in
+    /// TranslationSeedData.cs, but these are unit tests for the handler's logic, not the seed.</summary>
+    private static FakeTranslationRepository SeededTranslations()
+    {
+        var translations = new FakeTranslationRepository();
+        translations.Store.Add(Translation.Create("bot.decision.rejected", "ru", "❌ Ваша заявка отклонена."));
+        translations.Store.Add(Translation.Create("bot.decision.rejected", "en", "❌ Your application was declined."));
+        return translations;
     }
 
     private static DomainApplication CreateSurveyOfferedApplication()

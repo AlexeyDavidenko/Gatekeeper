@@ -47,6 +47,13 @@ builder.Services.AddSingleton<SiteVisitQueue>();
 builder.Services.AddHostedService<SiteVisitFlushWorker>();
 builder.Services.AddScoped<CircuitVisitContext>();
 
+// Localization: bulk-loaded, periodically-refreshed cache (same shape as the Bot's) + a
+// per-circuit LocaleContext/Translator pair — see Localization.cs.
+builder.Services.AddSingleton<TranslationCache>();
+builder.Services.AddHostedService<TranslationCacheRefreshWorker>();
+builder.Services.AddScoped<LocaleContext>();
+builder.Services.AddScoped<Translator>();
+
 var app = builder.Build();
 
 // Without this, an unhandled exception anywhere in the pipeline (e.g. a routing conflict, a bad

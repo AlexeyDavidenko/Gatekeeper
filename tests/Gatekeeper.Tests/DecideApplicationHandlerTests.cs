@@ -30,6 +30,7 @@ public class DecideApplicationHandlerTests
         FakeTenantDirectory? directory = null,
         FakeTenantContext? tenant = null,
         FakeUserRepository? users = null,
+        FakeTranslationRepository? translations = null,
         FakeUnitOfWork? unitOfWork = null,
         FakeClock? clock = null)
     {
@@ -39,10 +40,23 @@ public class DecideApplicationHandlerTests
         directory ??= new(adminChatId: -5000);
         tenant ??= new();
         users ??= new();
+        translations ??= SeededTranslations();
         unitOfWork ??= new();
         clock ??= new(TestNow);
 
-        return new(apps, moderation, queue, directory, tenant, users, unitOfWork, clock);
+        return new(apps, moderation, queue, directory, tenant, users, translations, unitOfWork, clock);
+    }
+
+    /// <summary>Seeds just the decision-DM keys these tests assert on — full seed data lives in
+    /// TranslationSeedData.cs, but these are unit tests for the handler's logic, not the seed.</summary>
+    private static FakeTranslationRepository SeededTranslations()
+    {
+        var translations = new FakeTranslationRepository();
+        translations.Store.Add(Translation.Create("bot.decision.approved", "ru", "✅ Ваша заявка одобрена, добро пожаловать!"));
+        translations.Store.Add(Translation.Create("bot.decision.approved", "en", "✅ Your application has been approved, welcome!"));
+        translations.Store.Add(Translation.Create("bot.decision.rejected", "ru", "❌ Ваша заявка отклонена."));
+        translations.Store.Add(Translation.Create("bot.decision.rejected", "en", "❌ Your application was declined."));
+        return translations;
     }
 
     private static DomainApplication CreateAwaitingReviewApplication()

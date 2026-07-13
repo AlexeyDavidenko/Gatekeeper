@@ -20,6 +20,7 @@ public sealed class CancelApplicationHandler(
     IModerationRepository moderation,
     ITelegramCommandQueue queue,
     IUserRepository users,
+    ITranslationRepository translations,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
@@ -45,8 +46,8 @@ public sealed class CancelApplicationHandler(
             JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.MainChatId, UserId: application.TelegramUserId)),
             application.Id, application.TelegramUserId, now));
 
-        var isRu = Lang.IsRussian(user?.LanguageCode);
-        var verdictDm = isRu ? "❌ Ваша заявка отклонена." : "❌ Your application was declined.";
+        var lang = Lang.Resolve(user?.LanguageCode);
+        var verdictDm = await translations.GetValueAsync("bot.decision.rejected", lang, ct);
         queue.Enqueue(TelegramCommand.Enqueue(
             TelegramCommandType.SendMessage,
             JsonSerializer.Serialize(new TelegramCommandPayload(ChatId: application.TelegramUserId, Text: verdictDm)),

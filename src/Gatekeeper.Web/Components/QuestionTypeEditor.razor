@@ -4,16 +4,17 @@
    docs/backlog.md on the MudBlazor migration for why). Captcha isn't offered — no rendering or
    answer-parsing exists for it yet. *@
 @inject IJSRuntime JS
+@inject Translator T
 
-<label>Тип ответа:
+<label>@T["web.qtype.label"]:
     <select name="type" class="q-type-select" @ref="_select">
-        <option value="Text" selected="@(Type == "Text")">Текст</option>
-        <option value="SingleChoice" selected="@(Type == "SingleChoice")">Один вариант (radio)</option>
-        <option value="MultiChoice" selected="@(Type == "MultiChoice")">Несколько вариантов (checkbox)</option>
+        <option value="Text" selected="@(Type == "Text")">@T["web.qtype.text"]</option>
+        <option value="SingleChoice" selected="@(Type == "SingleChoice")">@T["web.qtype.single_choice"]</option>
+        <option value="MultiChoice" selected="@(Type == "MultiChoice")">@T["web.qtype.multi_choice"]</option>
     </select>
 </label>
 <div class="q-options" hidden="@(Type is not ("SingleChoice" or "MultiChoice"))">
-    <p class="muted">Варианты ответа:</p>
+    <p class="muted">@T["web.qtype.options_label"]</p>
     <div class="q-options-list">
         @if (Options is not null)
         {
@@ -26,7 +27,7 @@
             }
         }
     </div>
-    <button type="button" class="link q-add-option">+ добавить вариант</button>
+    <button type="button" class="link q-add-option">@T["web.qtype.add_option"]</button>
 </div>
 
 @code {

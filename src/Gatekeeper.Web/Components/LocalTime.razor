@@ -1,8 +1,9 @@
 @inject IJSRuntime JS
+@inject Translator T
 
 @if (Value is null)
 {
-    <span>—</span>
+    <span>@T["common.empty_dash"]</span>
 }
 else
 {

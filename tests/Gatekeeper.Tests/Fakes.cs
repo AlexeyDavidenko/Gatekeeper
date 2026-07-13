@@ -177,6 +177,27 @@ public sealed class FakeModerationRepository : IModerationRepository
     }
 }
 
+public sealed class FakeTranslationRepository : ITranslationRepository
+{
+    private long _nextId = 1;
+    public List<Translation> Store { get; } = [];
+
+    public Task<IReadOnlyList<Translation>> GetAllAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<Translation>>(Store);
+
+    public Task<Translation?> GetAsync(string key, string languageCode, CancellationToken ct = default) =>
+        Task.FromResult(Store.FirstOrDefault(t => t.Key == key && t.LanguageCode == languageCode));
+
+    public Task AddAsync(Translation translation, CancellationToken ct = default)
+    {
+        FakeIds.Assign(translation, _nextId++);
+        Store.Add(translation);
+        return Task.CompletedTask;
+    }
+
+    public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
+}
+
 public sealed class FakeEvidenceStorage : IEvidenceStorage
 {
     public List<(string StoragePath, string ContentType, long SizeBytes)> Saved { get; } = [];

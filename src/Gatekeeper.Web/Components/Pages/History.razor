@@ -2,16 +2,17 @@
 @attribute [Authorize]
 @inject AdminApiClient Api
 @inject NavigationManager Nav
+@inject Translator T
 
-<h1>История решений</h1>
+<h1>@T["web.history.title"]</h1>
 
 @if (_apps is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else if (_apps.Count == 0)
 {
-    <p class="muted">Пока нет решённых заявок.</p>
+    <p class="muted">@T["web.history.empty"]</p>
 }
 else
 {
@@ -19,82 +20,82 @@ else
         <HeaderContent>
             <MudTh>#</MudTh>
             <MudTh></MudTh>
-            <MudTh>Пользователь</MudTh>
-            <MudTh>Статус</MudTh>
-            <MudTh>Отправлена</MudTh>
+            <MudTh>@UserLabel</MudTh>
+            <MudTh>@StatusLabel</MudTh>
+            <MudTh>@SubmittedLabel</MudTh>
             <AuthorizeView Context="ownerContext" Roles="Owner">
-                <Authorized><MudTh>Кем</MudTh><MudTh>Откуда</MudTh></Authorized>
+                <Authorized><MudTh>@ByLabel</MudTh><MudTh>@SourceLabel</MudTh></Authorized>
             </AuthorizeView>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="#">@context.Id</MudTd>
             <MudTd><Avatar PhotoFileId="@context.PhotoFileId" DisplayName="@context.DisplayName" Username="@context.Username" /></MudTd>
-            <MudTd DataLabel="Пользователь">@(context.DisplayName ?? "—") @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
-            <MudTd DataLabel="Статус">@(context.Status == "Approved" ? "✅ Принята" : "❌ Отклонена")</MudTd>
-            <MudTd DataLabel="Отправлена"><LocalTime Value="context.SubmittedAt" /></MudTd>
+            <MudTd DataLabel="@UserLabel">@(context.DisplayName ?? T["common.empty_dash"]) @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
+            <MudTd DataLabel="@StatusLabel">@(context.Status == "Approved" ? T["web.history.approved"] : T["web.history.rejected"])</MudTd>
+            <MudTd DataLabel="@SubmittedLabel"><LocalTime Value="context.SubmittedAt" /></MudTd>
             <AuthorizeView Context="ownerContext" Roles="Owner">
                 <Authorized>
                     @{ var decision = _decisions.GetValueOrDefault(context.Id); }
-                    <MudTd DataLabel="Кем">@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? "—")</MudTd>
-                    <MudTd DataLabel="Откуда">@(decision?.Source ?? "—")</MudTd>
+                    <MudTd DataLabel="@ByLabel">@(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? T["common.empty_dash"])</MudTd>
+                    <MudTd DataLabel="@SourceLabel">@(decision?.Source ?? T["common.empty_dash"])</MudTd>
                 </Authorized>
             </AuthorizeView>
-            <MudTd><a href="applications/@context.Id">Открыть</a></MudTd>
+            <MudTd><a href="applications/@context.Id">@T["web.queue.open_link"]</a></MudTd>
         </RowTemplate>
     </MudTable>
 }
 
 <AuthorizeView Context="archiveContext" Roles="Owner">
     <Authorized>
-        <h2>Архив журнала модерации</h2>
+        <h2>@T["web.history.archive_title"]</h2>
         <form method="post" action="history/archive" class="inline">
             <AntiforgeryToken />
-            <label>Архивировать записи журнала старше:
+            <label>@T["web.history.archive_older_than_label"]
                 <input type="date" name="olderThan" required />
             </label>
-            <button type="submit" class="approve">Архивировать</button>
+            <button type="submit" class="approve">@T["web.history.archive_button"]</button>
         </form>
         @if (Archived is not null)
         {
-            <p class="muted">Заархивировано записей: @Archived</p>
+            <p class="muted">@T["web.history.archived_count"]: @Archived</p>
         }
 
         @if (IncludeArchived)
         {
-            <a href="/history">Скрыть заархивированные</a>
+            <a href="/history">@T["web.history.hide_archived_link"]</a>
         }
         else
         {
-            <a href="/history?includeArchived=true">Показать заархивированные</a>
+            <a href="/history?includeArchived=true">@T["web.history.show_archived_link"]</a>
         }
 
         @if (IncludeArchived)
         {
             @if (_archived.Count == 0)
             {
-                <p class="muted">Архив пуст.</p>
+                <p class="muted">@T["web.history.archive_empty"]</p>
             }
             else
             {
                 <MudTable Items="_archived" Hover="true" Dense="true">
                     <HeaderContent>
-                        <MudTh>Когда</MudTh>
-                        <MudTh>Действие</MudTh>
-                        <MudTh>Заявка</MudTh>
-                        <MudTh>Кем</MudTh>
-                        <MudTh>Заархивировано</MudTh>
+                        <MudTh>@WhenLabel</MudTh>
+                        <MudTh>@ActionLabel</MudTh>
+                        <MudTh>@ApplicationLabel</MudTh>
+                        <MudTh>@ByLabel</MudTh>
+                        <MudTh>@ArchivedAtLabel</MudTh>
                         <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
-                        <MudTd DataLabel="Действие">@context.Action</MudTd>
-                        <MudTd DataLabel="Заявка">@(context.ApplicationId?.ToString() ?? "—")</MudTd>
-                        <MudTd DataLabel="Кем">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
-                        <MudTd DataLabel="Заархивировано"><LocalTime Value="context.ArchivedAt" /></MudTd>
+                        <MudTd DataLabel="@WhenLabel"><LocalTime Value="context.CreatedAt" /></MudTd>
+                        <MudTd DataLabel="@ActionLabel">@context.Action</MudTd>
+                        <MudTd DataLabel="@ApplicationLabel">@(context.ApplicationId?.ToString() ?? T["common.empty_dash"])</MudTd>
+                        <MudTd DataLabel="@ByLabel">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
+                        <MudTd DataLabel="@ArchivedAtLabel"><LocalTime Value="context.ArchivedAt" /></MudTd>
                         <MudTd>
                             <form method="post" action="history/@context.Id/unarchive" class="inline">
-                                <AntiforgeryToken /><button type="submit" class="link">Восстановить</button>
+                                <AntiforgeryToken /><button type="submit" class="link">@T["web.history.unarchive_button"]</button>
                             </form>
                         </MudTd>
                     </RowTemplate>
@@ -111,6 +112,16 @@ else
     private IReadOnlyList<ApplicationSummary>? _apps;
     private Dictionary<long, ModerationLogEntry> _decisions = [];
     private IReadOnlyList<ModerationLogEntry> _archived = [];
+
+    private string UserLabel => T["web.dashboard.user_column"];
+    private string StatusLabel => T["web.detail.status_label"];
+    private string SubmittedLabel => T["web.queue.submitted_column"];
+    private string ByLabel => T["web.history.by_column"];
+    private string SourceLabel => T["web.history.source_column"];
+    private string WhenLabel => T["web.dashboard.when_column"];
+    private string ActionLabel => T["web.dashboard.action_column"];
+    private string ApplicationLabel => T["web.history.application_column"];
+    private string ArchivedAtLabel => T["web.history.archived_at_column"];
 
     protected override async Task OnInitializedAsync()
     {

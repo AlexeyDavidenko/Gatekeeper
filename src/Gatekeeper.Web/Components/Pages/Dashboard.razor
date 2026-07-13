@@ -1,12 +1,13 @@
 @page "/"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject Translator T
 
-<h1>Дашборд</h1>
+<h1>@T["web.dashboard.title"]</h1>
 
 @if (_summary is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else
 {
@@ -14,49 +15,49 @@ else
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h4">@_summary.PendingCount</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">Ждут решения</MudText>
-                <MudLink Href="/queue">К очереди →</MudLink>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["web.dashboard.pending_label"]</MudText>
+                <MudLink Href="/queue">@T["web.dashboard.to_queue_link"]</MudLink>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h4">@_summary.ApprovedToday / @_summary.RejectedToday</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">Одобрено / отклонено сегодня</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["web.dashboard.today_label"]</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h4">@_summary.ApprovedWeek / @_summary.RejectedWeek</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">Одобрено / отклонено за 7 дней</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["web.dashboard.week_label"]</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4" Style="@(_summary.OutboxFailed > 0 ? "border: 2px solid var(--mud-palette-error)" : "")">
                 <MudText Typo="Typo.h4">@_summary.OutboxPending / @_summary.OutboxInFlight / @_summary.OutboxFailed</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">Outbox: ожидают / в полёте / ошибки</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["web.dashboard.outbox_label"]</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
 
-    <h2>Последние решения</h2>
+    <h2>@T["web.dashboard.recent_decisions_title"]</h2>
     @if (_summary.RecentDecisions.Count == 0)
     {
-        <p class="muted">Пока нет решений.</p>
+        <p class="muted">@T["web.dashboard.no_decisions"]</p>
     }
     else
     {
         <MudTable Items="_summary.RecentDecisions" Hover="true" Dense="true">
             <HeaderContent>
-                <MudTh>Когда</MudTh>
-                <MudTh>Пользователь</MudTh>
-                <MudTh>Действие</MudTh>
-                <MudTh>Кто решил</MudTh>
+                <MudTh>@WhenLabel</MudTh>
+                <MudTh>@UserLabel</MudTh>
+                <MudTh>@ActionLabel</MudTh>
+                <MudTh>@DecidedByLabel</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Когда"><LocalTime Value="context.CreatedAt" /></MudTd>
-                <MudTd DataLabel="Пользователь">@(context.DisplayName ?? "—") @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
-                <MudTd DataLabel="Действие">@(context.Action == "Approve" ? "✅ Одобрено" : "❌ Отклонено")</MudTd>
-                <MudTd DataLabel="Кто решил">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
+                <MudTd DataLabel="@WhenLabel"><LocalTime Value="context.CreatedAt" /></MudTd>
+                <MudTd DataLabel="@UserLabel">@(context.DisplayName ?? T["common.empty_dash"]) @(context.Username is null ? "" : $"(@{context.Username})")</MudTd>
+                <MudTd DataLabel="@ActionLabel">@(context.Action == "Approve" ? T["web.dashboard.approved"] : T["web.dashboard.rejected"])</MudTd>
+                <MudTd DataLabel="@DecidedByLabel">@(context.PerformedByName ?? context.PerformedByUserId.ToString())</MudTd>
             </RowTemplate>
         </MudTable>
     }
@@ -64,6 +65,11 @@ else
 
 @code {
     private DashboardSummary? _summary;
+
+    private string WhenLabel => T["web.dashboard.when_column"];
+    private string UserLabel => T["web.dashboard.user_column"];
+    private string ActionLabel => T["web.dashboard.action_column"];
+    private string DecidedByLabel => T["web.dashboard.decided_by_column"];
 
     protected override async Task OnInitializedAsync() => _summary = await Api.GetDashboardAsync();
 }

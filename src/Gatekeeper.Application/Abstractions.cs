@@ -66,6 +66,16 @@ public interface ITenantCatalogRepository
     Task SaveChangesAsync(CancellationToken ct = default);
 }
 
+/// <summary>Catalog-level, like ITenantCatalogRepository above — its own SaveChangesAsync rather
+/// than the shared tenant-scoped IUnitOfWork, since Translations live in the Catalog DB.</summary>
+public interface ITranslationRepository
+{
+    Task<IReadOnlyList<Translation>> GetAllAsync(CancellationToken ct = default);
+    Task<Translation?> GetAsync(string key, string languageCode, CancellationToken ct = default);
+    Task AddAsync(Translation translation, CancellationToken ct = default);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+
 /// <summary>Physically creates and migrates a new tenant's database.</summary>
 public interface ITenantProvisioner
 {

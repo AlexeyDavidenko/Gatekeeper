@@ -1,47 +1,48 @@
 @page "/questions"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject Translator T
 
-<h1>Вопросы анкеты</h1>
+<h1>@T["web.questions.title"]</h1>
 
 @if (_questions is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else if (_questions.Count == 0)
 {
-    <p class="muted">Вопросов пока нет.</p>
+    <p class="muted">@T["web.questions.empty"]</p>
 }
 else
 {
     <MudTable Items="_questions" Hover="true" Dense="true">
         <HeaderContent>
             <MudTh>#</MudTh>
-            <MudTh>Текст</MudTh>
-            <MudTh>Тип</MudTh>
-            <MudTh>Обязательный</MudTh>
-            <MudTh>Активен</MudTh>
+            <MudTh>@TextLabel</MudTh>
+            <MudTh>@TypeColumnLabel</MudTh>
+            <MudTh>@RequiredLabel</MudTh>
+            <MudTh>@ActiveLabel</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="#">@context.Position</MudTd>
-            <MudTd DataLabel="Текст">@((MarkupString)context.PromptText)</MudTd>
-            <MudTd DataLabel="Тип">@TypeLabel(context)</MudTd>
-            <MudTd DataLabel="Обязательный">@(context.IsRequired ? "да" : "нет")</MudTd>
-            <MudTd DataLabel="Активен">@(context.IsActive ? "да" : "нет")</MudTd>
+            <MudTd DataLabel="@TextLabel">@((MarkupString)context.PromptText)</MudTd>
+            <MudTd DataLabel="@TypeColumnLabel">@TypeLabel(context)</MudTd>
+            <MudTd DataLabel="@RequiredLabel">@(context.IsRequired ? T["web.common.yes"] : T["web.common.no"])</MudTd>
+            <MudTd DataLabel="@ActiveLabel">@(context.IsActive ? T["web.common.yes"] : T["web.common.no"])</MudTd>
             <MudTd>
                 <div class="row-actions">
                     <form method="post" action="questions/@context.Id/move-up" class="inline">
-                        <AntiforgeryToken /><button type="submit" class="link" title="Вверх">▲</button>
+                        <AntiforgeryToken /><button type="submit" class="link" title="@T["web.questions.move_up"]">▲</button>
                     </form>
                     <form method="post" action="questions/@context.Id/move-down" class="inline">
-                        <AntiforgeryToken /><button type="submit" class="link" title="Вниз">▼</button>
+                        <AntiforgeryToken /><button type="submit" class="link" title="@T["web.questions.move_down"]">▼</button>
                     </form>
-                    <a href="questions/@context.Id/edit">Редактировать</a>
+                    <a href="questions/@context.Id/edit">@T["web.questions.edit_link"]</a>
                     @if (context.IsActive)
                     {
                         <form method="post" action="questions/@context.Id/deactivate" class="inline">
-                            <AntiforgeryToken /><button type="submit" class="link">Скрыть</button>
+                            <AntiforgeryToken /><button type="submit" class="link">@T["web.questions.hide_button"]</button>
                         </form>
                     }
                 </div>
@@ -50,24 +51,29 @@ else
     </MudTable>
 }
 
-<h2>Добавить вопрос</h2>
+<h2>@T["web.questions.add_title"]</h2>
 <form method="post" action="questions/create">
     <AntiforgeryToken />
     <RichTextEditor Name="promptText" />
-    <label><input type="checkbox" name="isRequired" value="true" /> обязательный</label>
+    <label><input type="checkbox" name="isRequired" value="true" /> @T["web.questions.required_checkbox"]</label>
     <QuestionTypeEditor Type="Text" />
-    <button type="submit" class="approve">Добавить</button>
+    <button type="submit" class="approve">@T["web.questions.add_button"]</button>
 </form>
 
 @code {
     private IReadOnlyList<QuestionDto>? _questions;
 
+    private string TextLabel => T["web.questions.text_column"];
+    private string TypeColumnLabel => T["web.qtype.label"];
+    private string RequiredLabel => T["web.questions.required_column"];
+    private string ActiveLabel => T["web.questions.active_column"];
+
     protected override async Task OnInitializedAsync() => _questions = await Api.GetQuestionsAsync();
 
-    private static string TypeLabel(QuestionDto q) => q.Type switch
+    private string TypeLabel(QuestionDto q) => q.Type switch
     {
-        "SingleChoice" => $"Один вариант ({q.Options?.Count ?? 0})",
-        "MultiChoice" => $"Несколько вариантов ({q.Options?.Count ?? 0})",
-        _ => "Текст",
+        "SingleChoice" => $"{T["web.qtype.single_choice"]} ({q.Options?.Count ?? 0})",
+        "MultiChoice" => $"{T["web.qtype.multi_choice"]} ({q.Options?.Count ?? 0})",
+        _ => T["web.qtype.text"],
     };
 }

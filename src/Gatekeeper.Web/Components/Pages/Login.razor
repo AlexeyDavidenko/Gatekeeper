@@ -2,9 +2,10 @@
 @attribute [AllowAnonymous]
 @inject IConfiguration Config
 @inject NavigationManager Nav
+@inject Translator T
 
-<h1>Вход</h1>
-<p>Войдите через Telegram. Доступ — только участникам админ-группы.</p>
+<h1>@T["web.login.title"]</h1>
+<p>@T["web.login.subtitle"]</p>
 
 @if (Error is not null)
 {
@@ -26,6 +27,6 @@
     {
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
         if (query.TryGetValue("error", out var e))
-            Error = e == "forbidden" ? "Вы не состоите в админ-группе." : "Не удалось проверить вход.";
+            Error = e == "forbidden" ? T["web.login.error_forbidden"] : T["web.login.error_invalid"];
     }
 }

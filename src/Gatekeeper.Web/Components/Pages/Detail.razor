@@ -1,21 +1,22 @@
 @page "/applications/{Id:long}"
 @attribute [Authorize]
 @inject AdminApiClient Api
+@inject Translator T
 
-<p><a href="/queue">← к очереди</a></p>
+<p><a href="/queue">@T["web.detail.back_to_queue"]</a></p>
 
 @if (_card is null)
 {
-    <p>Загрузка…</p>
+    <p>@T["web.common.loading"]</p>
 }
 else
 {
-    <h1>Заявка #@_card.Id</h1>
+    <h1>@T["web.detail.application_title"] #@_card.Id</h1>
     <p>
         <Avatar PhotoFileId="@_card.PhotoFileId" DisplayName="@_card.DisplayName" Username="@_card.Username" Large="true" />
-        @(_card.DisplayName ?? "—") @(_card.Username is null ? "" : $"(@{_card.Username})")
+        @(_card.DisplayName ?? T["common.empty_dash"]) @(_card.Username is null ? "" : $"(@{_card.Username})")
     </p>
-    <p class="muted">статус: @_card.Status</p>
+    <p class="muted">@T["web.detail.status_label"]: @StatusLabel(_card.Status)</p>
     @if (!string.IsNullOrWhiteSpace(_card.Bio))
     {
         <p class="bio">ℹ️ @_card.Bio</p>
@@ -26,7 +27,7 @@ else
         {
             <div class="answer">
                 <div class="q">@ans.Position. @((MarkupString)ans.Prompt)</div>
-                <div class="a">@(string.IsNullOrWhiteSpace(ans.Text) ? "—" : ans.Text)</div>
+                <div class="a">@(string.IsNullOrWhiteSpace(ans.Text) ? T["common.empty_dash"] : ans.Text)</div>
             </div>
         }
     </div>
@@ -37,36 +38,36 @@ else
             <form method="post" action="applications/@_card.Id/approve">
                 <AntiforgeryToken />
                 <input type="hidden" name="rowVersion" value="@_card.RowVersion" />
-                <button type="submit" class="approve">Принять</button>
+                <button type="submit" class="approve">@T["web.detail.approve_button"]</button>
             </form>
             <form method="post" action="applications/@_card.Id/reject">
                 <AntiforgeryToken />
                 <input type="hidden" name="rowVersion" value="@_card.RowVersion" />
-                <input type="text" name="reason" placeholder="Причина (необязательно)" />
-                <button type="submit" class="reject">Отклонить</button>
+                <input type="text" name="reason" placeholder="@ReasonPlaceholder" />
+                <button type="submit" class="reject">@T["web.detail.reject_button"]</button>
             </form>
         </div>
     }
     else
     {
-        <p class="muted">Решение уже принято.</p>
+        <p class="muted">@T["web.detail.already_decided"]</p>
     }
 
     <div class="moderation">
-        <h2>Модерация пользователя</h2>
+        <h2>@T["web.detail.moderation_title"]</h2>
         <form method="post" action="applications/@_card.Id/moderate" enctype="multipart/form-data">
             <AntiforgeryToken />
             <input type="hidden" name="telegramUserId" value="@_card.TelegramUserId" />
             <input type="hidden" name="chatId" value="@_card.ChatId" />
             <select name="action">
-                <option value="Ban">Забанить</option>
-                <option value="Mute">Заглушить</option>
-                <option value="Kick">Кикнуть</option>
-                <option value="Warn">Предупредить</option>
+                <option value="Ban">@T["web.detail.action_ban"]</option>
+                <option value="Mute">@T["web.detail.action_mute"]</option>
+                <option value="Kick">@T["web.detail.action_kick"]</option>
+                <option value="Warn">@T["web.detail.action_warn"]</option>
             </select>
-            <input type="text" name="reason" placeholder="Причина (необязательно)" />
+            <input type="text" name="reason" placeholder="@ReasonPlaceholder" />
             <input type="file" name="evidence" accept="image/*" />
-            <button type="submit" class="reject">Применить</button>
+            <button type="submit" class="reject">@T["web.detail.apply_button"]</button>
         </form>
     </div>
 }
@@ -75,6 +76,21 @@ else
     [Parameter] public long Id { get; set; }
 
     private ApplicationCard? _card;
+
+    private string ReasonPlaceholder => T["web.detail.reason_placeholder"];
+
+    private string StatusLabel(string status) => status switch
+    {
+        "JoinRequested" => T["web.detail.status.join_requested"],
+        "SurveyOffered" => T["web.detail.status.survey_offered"],
+        "InSurvey" => T["web.detail.status.in_survey"],
+        "AwaitingReview" => T["web.detail.status.awaiting_review"],
+        "Approved" => T["web.detail.status.approved"],
+        "Rejected" => T["web.detail.status.rejected"],
+        "Abandoned" => T["web.detail.status.abandoned"],
+        "Cancelled" => T["web.detail.status.cancelled"],
+        _ => status,
+    };
 
     protected override async Task OnInitializedAsync() => _card = await Api.GetCardAsync(Id);
 }

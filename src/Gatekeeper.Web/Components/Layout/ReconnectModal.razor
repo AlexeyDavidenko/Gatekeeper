@@ -1,4 +1,6 @@
-﻿<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+@inject Translator T
+
+<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
 
 <dialog id="components-reconnect-modal" data-nosnippet>
     <div class="components-reconnect-container">
@@ -7,25 +9,25 @@
             <div></div>
         </div>
         <p class="components-reconnect-first-attempt-visible">
-            Rejoining the server...
+            @T["web.reconnect.rejoining"]
         </p>
         <p class="components-reconnect-repeated-attempt-visible">
-            Rejoin failed... trying again in <span id="components-seconds-to-next-attempt"></span> seconds.
+            @T["web.reconnect.rejoin_failed"] <span id="components-seconds-to-next-attempt"></span> @T["web.reconnect.seconds"]
         </p>
         <p class="components-reconnect-failed-visible">
-            Failed to rejoin.<br />Please retry or reload the page.
+            @T["web.reconnect.failed"]<br />@T["web.reconnect.retry_or_reload"]
         </p>
         <button id="components-reconnect-button" class="components-reconnect-failed-visible">
-            Retry
+            @T["web.reconnect.retry_button"]
         </button>
         <p class="components-pause-visible">
-            The session has been paused by the server.
+            @T["web.reconnect.paused"]
         </p>
         <p class="components-resume-failed-visible">
-            Failed to resume the session.<br />Please retry or reload the page.
+            @T["web.reconnect.resume_failed"]<br />@T["web.reconnect.retry_or_reload"]
         </p>
         <button id="components-resume-button" class="components-pause-visible components-resume-failed-visible">
-            Resume
+            @T["web.reconnect.resume_button"]
         </button>
     </div>
 </dialog>
