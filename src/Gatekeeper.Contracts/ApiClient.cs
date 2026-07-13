@@ -49,12 +49,18 @@ public sealed record AnswerDto(string Prompt, string Type, int Position, string?
 
 // Question management. Type is "Text"/"SingleChoice"/"MultiChoice" — Captcha exists on the domain
 // but has no rendering/answer-parsing behind it, so it's not exposed as a choosable type here.
-// Options carries the choice labels (null/empty for Text questions).
+// Options carries the choice labels (null/empty for Text questions). PromptTextEn/OptionsEn are the
+// raw admin-authored English variant (null/empty if not yet translated) — this is the editing
+// surface, so unlike the applicant-facing NextQuestionDto, nothing here falls back to Russian.
 public sealed record QuestionDto(
     long Id, int Position, string PromptText, bool IsRequired, bool IsActive,
-    string Type, IReadOnlyList<string>? Options);
-public sealed record CreateQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options);
-public sealed record EditQuestionRequest(string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options, bool IsActive);
+    string Type, IReadOnlyList<string>? Options, string? PromptTextEn = null, IReadOnlyList<string>? OptionsEn = null);
+public sealed record CreateQuestionRequest(
+    string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options,
+    string? PromptTextEn = null, IReadOnlyList<string>? OptionsEn = null);
+public sealed record EditQuestionRequest(
+    string Type, string PromptText, bool IsRequired, IReadOnlyList<string>? Options, bool IsActive,
+    string? PromptTextEn = null, IReadOnlyList<string>? OptionsEn = null);
 
 public sealed record ModerationLogEntry(
     long Id, long TelegramUserId, string? Username, string? DisplayName, long? ApplicationId,

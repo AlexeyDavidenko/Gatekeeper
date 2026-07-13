@@ -74,4 +74,23 @@ public class EditQuestionHandlerTests
         Assert.True(updated.IsActive);
         Assert.Equal("New prompt", updated.PromptText);
     }
+
+    [Fact]
+    public async Task EditQuestionHandler_Roundtrips_English_Prompt_And_Options()
+    {
+        var questions = new FakeQuestionRepository();
+        var question = Question.Create(1, QuestionType.SingleChoice, "Вопрос?", isRequired: true,
+            configJson: ChoiceOptions.SerializeQuestionOptions(["Да", "Нет"]), TestNow);
+        questions.Seed(question);
+
+        var handler = new EditQuestionHandler(questions, new FakeUnitOfWork(), new FakeClock(TestNow.AddDays(1)));
+        await handler.HandleAsync(new EditQuestionCommand(
+            question.Id, QuestionType.SingleChoice, "Вопрос?", IsRequired: true,
+            ConfigJson: ChoiceOptions.SerializeQuestionOptions(["Да", "Нет"]), IsActive: true,
+            PromptTextEn: "Question?", ConfigJsonEn: ChoiceOptions.SerializeQuestionOptions(["Yes", "No"])));
+
+        var updated = questions.Store.Single(q => q.Id == question.Id);
+        Assert.Equal("Question?", updated.PromptTextEn);
+        Assert.Equal(["Yes", "No"], updated.OptionsFor("en"));
+    }
 }

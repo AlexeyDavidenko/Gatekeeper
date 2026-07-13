@@ -20,7 +20,7 @@ document.addEventListener('click', (e) => {
         const list = addBtn.closest('.q-options').querySelector('.q-options-list');
         const row = document.createElement('div');
         row.className = 'q-option-row';
-        row.innerHTML = '<input type="text" name="options" /><button type="button" class="link q-remove-option">✕</button>';
+        row.innerHTML = '<input type="text" name="options" /><input type="text" name="optionsEn" placeholder="EN" /><button type="button" class="link q-remove-option">✕</button>';
         list.appendChild(row);
         return;
     }

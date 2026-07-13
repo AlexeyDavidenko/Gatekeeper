@@ -288,7 +288,9 @@ public static class QuestionsEndpoints
                 return Results.BadRequest("Invalid question type.");
 
             var configJson = ChoiceOptions.SerializeQuestionOptions(body.Options);
-            var id = await handler.HandleAsync(new CreateQuestionCommand(type, body.PromptText, body.IsRequired, configJson), ct);
+            var configJsonEn = ChoiceOptions.SerializeQuestionOptions(body.OptionsEn);
+            var id = await handler.HandleAsync(new CreateQuestionCommand(
+                type, body.PromptText, body.IsRequired, configJson, body.PromptTextEn, configJsonEn), ct);
             return Results.Ok(new { Id = id });
         });
 
@@ -298,7 +300,9 @@ public static class QuestionsEndpoints
                 return Results.BadRequest("Invalid question type.");
 
             var configJson = ChoiceOptions.SerializeQuestionOptions(body.Options);
-            await handler.HandleAsync(new EditQuestionCommand(id, type, body.PromptText, body.IsRequired, configJson, body.IsActive), ct);
+            var configJsonEn = ChoiceOptions.SerializeQuestionOptions(body.OptionsEn);
+            await handler.HandleAsync(new EditQuestionCommand(
+                id, type, body.PromptText, body.IsRequired, configJson, body.IsActive, body.PromptTextEn, configJsonEn), ct);
             return Results.NoContent();
         });
 
@@ -325,7 +329,8 @@ public static class QuestionsEndpoints
 
     private static QuestionDto ToDto(Question q) => new(
         q.Id, q.Position, q.PromptText, q.IsRequired, q.IsActive,
-        q.Type.ToString(), ChoiceOptions.ParseQuestionOptions(q.ConfigJson));
+        q.Type.ToString(), ChoiceOptions.ParseQuestionOptions(q.ConfigJson),
+        q.PromptTextEn, ChoiceOptions.ParseQuestionOptions(q.ConfigJsonEn));
 }
 
 public static class ModerationEndpoints

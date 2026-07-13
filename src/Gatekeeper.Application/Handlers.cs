@@ -96,17 +96,18 @@ public sealed class SubmitAnswerHandler(
             ?? throw new InvalidOperationException("Current question not found.");
 
         var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+        var lang = Lang.Resolve(user?.LanguageCode);
 
         string? answerText;
         string? optionsJson;
         if (current.Type is QuestionType.SingleChoice or QuestionType.MultiChoice)
         {
-            var options = ChoiceOptions.ParseQuestionOptions(current.ConfigJson) ?? [];
+            var options = current.OptionsFor(lang) ?? [];
             if (cmd.SelectedOptionIndexes is not { Count: > 0 })
             {
                 // Stray free text (or an empty submit) while a button-only question is pending —
                 // re-prompt the same question instead of silently recording it as the answer.
-                return new NextStep(current.Id, current.PromptText, current.Type.ToString(), Completed: false,
+                return new NextStep(current.Id, current.PromptTextFor(lang), current.Type.ToString(), Completed: false,
                     user?.LanguageCode, options);
             }
 
@@ -120,7 +121,10 @@ public sealed class SubmitAnswerHandler(
             optionsJson = null;
         }
 
-        var answer = Answer.Create(current.Id, current.PromptText, current.Type, current.Position,
+        // Freezes whichever language variant was actually shown to the applicant — same job as
+        // every other snapshot field here (recording history even if the live Question changes
+        // later), now also true of its language.
+        var answer = Answer.Create(current.Id, current.PromptTextFor(lang), current.Type, current.Position,
             answerText, optionsJson, now);
         var next = await questions.GetNextActiveAsync(current.Position, ct);
         application.AddAnswer(answer, next?.Id, now);
@@ -150,8 +154,8 @@ public sealed class SubmitAnswerHandler(
 
         return next is null
             ? new NextStep(null, null, null, Completed: true, user?.LanguageCode)
-            : new NextStep(next.Id, next.PromptText, next.Type.ToString(), Completed: false,
-                user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(next.ConfigJson));
+            : new NextStep(next.Id, next.PromptTextFor(lang), next.Type.ToString(), Completed: false,
+                user?.LanguageCode, next.OptionsFor(lang));
     }
 }
 
@@ -173,6 +177,7 @@ public sealed class StartSurveyHandler(
         var application = await applications.GetActiveForUserAsync(cmd.TelegramUserId, ct)
             ?? throw new InvalidOperationException("No active application for this user.");
         var user = await users.GetByTelegramIdAsync(cmd.TelegramUserId, ct);
+        var lang = Lang.Resolve(user?.LanguageCode);
 
         if (application.Status == ApplicationStatus.SurveyOffered)
         {
@@ -180,8 +185,8 @@ public sealed class StartSurveyHandler(
                 ?? throw new InvalidOperationException("No active questions configured.");
             application.StartSurvey(firstQ.Id, now);
             await unitOfWork.SaveChangesAsync(ct);
-            return new NextStep(firstQ.Id, firstQ.PromptText, firstQ.Type.ToString(), Completed: false,
-                user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(firstQ.ConfigJson));
+            return new NextStep(firstQ.Id, firstQ.PromptTextFor(lang), firstQ.Type.ToString(), Completed: false,
+                user?.LanguageCode, firstQ.OptionsFor(lang));
         }
 
         // Idempotent re-tap (double-tap "Продолжить", or tapping again after already progressing
@@ -191,8 +196,8 @@ public sealed class StartSurveyHandler(
         {
             var current = await questions.GetByIdAsync(currentId, ct);
             if (current is not null)
-                return new NextStep(current.Id, current.PromptText, current.Type.ToString(), Completed: false,
-                    user?.LanguageCode, ChoiceOptions.ParseQuestionOptions(current.ConfigJson));
+                return new NextStep(current.Id, current.PromptTextFor(lang), current.Type.ToString(), Completed: false,
+                    user?.LanguageCode, current.OptionsFor(lang));
         }
 
         // Degenerate fallback (InSurvey but no current question, e.g. it was deleted mid-survey) —

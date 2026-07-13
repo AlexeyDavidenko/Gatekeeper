@@ -325,6 +325,8 @@ public static class TranslationSeedData
         ("web.questions.required_checkbox", "en", "required"),
         ("web.questions.add_button", "ru", "Добавить"),
         ("web.questions.add_button", "en", "Add"),
+        ("web.questions.prompt_en_label", "ru", "EN (необязательно — если не заполнено, показывается русский текст)"),
+        ("web.questions.prompt_en_label", "en", "EN (optional — falls back to Russian if left blank)"),
 
         // --- Web: QuestionEdit.razor -------------------------------------------------------------
         ("web.questionedit.back_to_questions", "ru", "← к вопросам"),

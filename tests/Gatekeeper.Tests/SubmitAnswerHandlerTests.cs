@@ -151,6 +151,45 @@ public class SubmitAnswerHandlerTests
     }
 
     [Fact]
+    public async Task SingleChoice_Question_Records_English_Label_For_An_English_Language_User()
+    {
+        var apps = new FakeApplicationRepository();
+        var questions = new FakeQuestionRepository();
+        var queue = new FakeTelegramCommandQueue();
+
+        // Seed a SingleChoice question with a matching-count English translation.
+        var q1 = Question.Create(
+            1, QuestionType.SingleChoice, "Выберите один",
+            isRequired: true,
+            configJson: ChoiceOptions.SerializeQuestionOptions(["Реклама", "Друзья", "Поиск"]),
+            TestNow,
+            promptTextEn: "Pick one",
+            configJsonEn: ChoiceOptions.SerializeQuestionOptions(["Ads", "Friends", "Search"]));
+        questions.Seed(q1);
+
+        var application = DomainApplication.FromJoinRequest(TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
+        application.MarkSurveyOffered();
+        application.StartSurvey(q1.Id, TestNow);
+        apps.Seed(application, id: 1);
+
+        var user = TelegramUser.FirstSighting(
+            TestTelegramUserId, isBot: false, isPremium: false,
+            username: "bob", firstName: "Bob", lastName: null,
+            languageCode: "en_US", bio: null, photoFileId: null,
+            normalize: (f, l) => $"{f} {l}".Trim().ToLowerInvariant(), TestNow);
+        var userRepo = new FakeUserRepository();
+        userRepo.Seed(user);
+
+        var handler = CreateHandler(apps, questions, userRepo, queue);
+        var result = await handler.HandleAsync(new SubmitAnswerCommand(TestTelegramUserId, Text: null, SelectedOptionIndexes: new[] { 1 }));
+
+        var answer = Assert.Single(apps.Store[1].Answers);
+        Assert.Equal("Friends", answer.Text);
+        Assert.Equal("Pick one", answer.PromptSnapshot);
+        Assert.True(result.Completed);
+    }
+
+    [Fact]
     public async Task MultiChoice_Question_Joins_Multiple_Labels_With_Comma_Space()
     {
         var apps = new FakeApplicationRepository();

@@ -72,6 +72,35 @@ public class StartSurveyHandlerTests
     }
 
     [Fact]
+    public async Task Returns_English_Prompt_And_Options_For_An_English_Language_User()
+    {
+        var apps = new FakeApplicationRepository();
+        var questions = new FakeQuestionRepository();
+        var users = new FakeUserRepository();
+
+        var application = DomainApplication.FromJoinRequest(TestTelegramUserId, TestMainChatId, TestUserChatId, TestInviteLink, TestNow);
+        application.MarkSurveyOffered();
+        apps.Seed(application, id: 1);
+
+        var ru = ChoiceOptions.SerializeQuestionOptions(["Да", "Нет"]);
+        var en = ChoiceOptions.SerializeQuestionOptions(["Yes", "No"]);
+        var q1 = Question.Create(1, QuestionType.SingleChoice, "Согласны?", isRequired: true, configJson: ru, TestNow,
+            promptTextEn: "Agree?", configJsonEn: en);
+        questions.Seed(q1);
+
+        var user = TelegramUser.FirstSighting(TestTelegramUserId, isBot: false, isPremium: false,
+            username: "bob", firstName: "Bob", lastName: null, languageCode: "en_US",
+            bio: null, photoFileId: null, normalize: (f, l) => $"{f} {l}".Trim().ToLowerInvariant(), TestNow);
+        users.Seed(user);
+
+        var handler = CreateHandler(apps, questions, users);
+        var result = await handler.HandleAsync(new StartSurveyCommand(TestTelegramUserId));
+
+        Assert.Equal("Agree?", result.Prompt);
+        Assert.Equal(["Yes", "No"], result.Options);
+    }
+
+    [Fact]
     public async Task Throws_When_No_Active_Questions_Configured()
     {
         var apps = new FakeApplicationRepository();

@@ -88,21 +88,22 @@ public sealed class AdminApiClient(HttpClient http, IConfiguration config)
     }
 
     public async Task CreateQuestionAsync(
-        string type, string promptText, bool isRequired, IReadOnlyList<string>? options, CancellationToken ct = default)
+        string type, string promptText, bool isRequired, IReadOnlyList<string>? options,
+        string? promptTextEn = null, IReadOnlyList<string>? optionsEn = null, CancellationToken ct = default)
     {
         using var res = await http.SendAsync(
-            Post("/questions", new CreateQuestionRequest(type, promptText, isRequired, options)), ct);
+            Post("/questions", new CreateQuestionRequest(type, promptText, isRequired, options, promptTextEn, optionsEn)), ct);
         res.EnsureSuccessStatusCode();
     }
 
     public async Task EditQuestionAsync(
         long id, string type, string promptText, bool isRequired, IReadOnlyList<string>? options, bool isActive,
-        CancellationToken ct = default)
+        string? promptTextEn = null, IReadOnlyList<string>? optionsEn = null, CancellationToken ct = default)
     {
         var msg = new HttpRequestMessage(HttpMethod.Put, $"/questions/{id}")
         {
             Headers = { { "X-Tenant-Id", TenantId.ToString() } },
-            Content = JsonContent.Create(new EditQuestionRequest(type, promptText, isRequired, options, isActive)),
+            Content = JsonContent.Create(new EditQuestionRequest(type, promptText, isRequired, options, isActive, promptTextEn, optionsEn)),
         };
         using var res = await http.SendAsync(msg, ct);
         res.EnsureSuccessStatusCode();

@@ -130,8 +130,11 @@ public static class WebEndpoints
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
             var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
+            var promptTextEn = form["promptTextEn"].ToString() is { Length: > 0 } pEn ? RichTextSanitizer.Sanitize(pEn) : null;
             var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
-            await api.CreateQuestionAsync(type, promptText, form["isRequired"] == "true", ParseOptions(form, type), ct);
+            await api.CreateQuestionAsync(
+                type, promptText, form["isRequired"] == "true", ParseOptions(form, type, "options"),
+                promptTextEn, ParseOptions(form, type, "optionsEn"), ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/save", async (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
@@ -139,10 +142,11 @@ public static class WebEndpoints
             await ValidateAsync(af, ctx);
             var form = await ctx.Request.ReadFormAsync(ct);
             var promptText = RichTextSanitizer.Sanitize(form["promptText"]);
+            var promptTextEn = form["promptTextEn"].ToString() is { Length: > 0 } pEn ? RichTextSanitizer.Sanitize(pEn) : null;
             var type = form["type"].ToString() is { Length: > 0 } t ? t : "Text";
             await api.EditQuestionAsync(
-                id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type),
-                form["isActive"] == "true", ct);
+                id, type, promptText, form["isRequired"] == "true", ParseOptions(form, type, "options"),
+                form["isActive"] == "true", promptTextEn, ParseOptions(form, type, "optionsEn"), ct);
             return Results.Redirect("/questions");
         });
         questions.MapPost("/{id:long}/move-up", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
@@ -221,10 +225,14 @@ public static class WebEndpoints
         return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/queue?notice=conflict" : "/queue");
     }
 
-    private static IReadOnlyList<string>? ParseOptions(IFormCollection form, string type)
+    // fieldName is "options" (RU, required) or "optionsEn" (EN, optional — see QuestionTypeEditor's
+    // paired-row markup). Blank-filtering means a partially-filled EN list naturally ends up shorter
+    // than the RU list, which Question.OptionsFor already treats as "not translated" and ignores
+    // wholesale rather than risk a misaligned answer index — no special casing needed here.
+    private static IReadOnlyList<string>? ParseOptions(IFormCollection form, string type, string fieldName)
     {
         if (type is not ("SingleChoice" or "MultiChoice")) return null;
-        var values = form["options"].Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()).ToList();
+        var values = form[fieldName].Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()).ToList();
         return values.Count > 0 ? values : null;
     }
 

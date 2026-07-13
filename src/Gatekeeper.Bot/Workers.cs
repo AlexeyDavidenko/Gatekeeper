@@ -20,8 +20,10 @@ public sealed class TelegramUpdateWorker(
 {
     // Only these two are supported — Telegram's own language_code covers dozens, anything not
     // Russian falls back to English. Applies to every bit of bot-generated text (greeting,
-    // thank-you, decision DM, admin-group command replies) — question prompts stay whatever the
-    // admin typed, unlocalized.
+    // thank-you, decision DM, admin-group command replies). Question prompts/options are also
+    // bilingual now, but that resolution happens server-side (Question.PromptTextFor/OptionsFor,
+    // called from Handlers.cs) before the DTO ever reaches this class — NextQuestionDto.Prompt/
+    // Options arrive already in the applicant's language, same as everything else here.
     private static bool IsRussian(string? languageCode) =>
         languageCode?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
 

@@ -1,5 +1,5 @@
 @* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Options are
-   posted back as repeated "options" form fields (add/remove rows handled client-side by
+   posted back as repeated "options"/"optionsEn" form fields (add/remove rows handled client-side by
    wwwroot/js/questionoptions.js, a plain form post — not rewritten to a direct C# call, see
    docs/backlog.md on the MudBlazor migration for why). Captcha isn't offered — no rendering or
    answer-parsing exists for it yet. *@
@@ -18,10 +18,13 @@
     <div class="q-options-list">
         @if (Options is not null)
         {
-            @foreach (var opt in Options)
+            @for (var i = 0; i < Options.Count; i++)
             {
+                var opt = Options[i];
+                var optEn = OptionsEn is not null && i < OptionsEn.Count ? OptionsEn[i] : null;
                 <div class="q-option-row">
                     <input type="text" name="options" value="@opt" />
+                    <input type="text" name="optionsEn" value="@optEn" placeholder="EN" />
                     <button type="button" class="link q-remove-option">✕</button>
                 </div>
             }
@@ -33,6 +36,7 @@
 @code {
     [Parameter] public string Type { get; set; } = "Text";
     [Parameter] public IReadOnlyList<string>? Options { get; set; }
+    [Parameter] public IReadOnlyList<string>? OptionsEn { get; set; }
 
     private ElementReference _select;
 

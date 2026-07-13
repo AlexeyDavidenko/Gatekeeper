@@ -55,6 +55,8 @@ else
 <form method="post" action="questions/create">
     <AntiforgeryToken />
     <RichTextEditor Name="promptText" />
+    <p class="muted">@T["web.questions.prompt_en_label"]</p>
+    <RichTextEditor Name="promptTextEn" Required="false" />
     <label><input type="checkbox" name="isRequired" value="true" /> @T["web.questions.required_checkbox"]</label>
     <QuestionTypeEditor Type="Text" />
     <button type="submit" class="approve">@T["web.questions.add_button"]</button>

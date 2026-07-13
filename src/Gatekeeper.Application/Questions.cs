@@ -6,8 +6,12 @@ namespace Gatekeeper.Application;
 // come back as selected option indices) — Captcha still has no rendering/answer-parsing behind it,
 // so question management doesn't expose it as a choosable type.
 
-public sealed record CreateQuestionCommand(QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson);
-public sealed record EditQuestionCommand(long QuestionId, QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson, bool IsActive);
+public sealed record CreateQuestionCommand(
+    QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson,
+    string? PromptTextEn = null, string? ConfigJsonEn = null);
+public sealed record EditQuestionCommand(
+    long QuestionId, QuestionType Type, string PromptText, bool IsRequired, string? ConfigJson, bool IsActive,
+    string? PromptTextEn = null, string? ConfigJsonEn = null);
 public sealed record MoveQuestionCommand(long QuestionId, bool Up);
 public sealed record DeactivateQuestionCommand(long QuestionId);
 
@@ -19,7 +23,8 @@ public sealed class CreateQuestionHandler(IQuestionRepository questions, IUnitOf
         var all = await questions.GetAllAsync(ct);
         var nextPosition = all.Count == 0 ? 1 : all.Max(q => q.Position) + 1;
 
-        var question = Question.Create(nextPosition, cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, now);
+        var question = Question.Create(
+            nextPosition, cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, now, cmd.PromptTextEn, cmd.ConfigJsonEn);
         await questions.AddAsync(question, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return question.Id;
@@ -33,7 +38,7 @@ public sealed class EditQuestionHandler(IQuestionRepository questions, IUnitOfWo
         var question = await questions.GetByIdAsync(cmd.QuestionId, ct)
             ?? throw new InvalidOperationException($"Question {cmd.QuestionId} not found.");
         var now = clock.UtcNow;
-        question.Edit(cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, now);
+        question.Edit(cmd.Type, cmd.PromptText, cmd.IsRequired, cmd.ConfigJson, now, cmd.PromptTextEn, cmd.ConfigJsonEn);
 
         // The list page's own "Скрыть" quick-action already deactivates — this is the only way
         // back, since until now nothing could ever flip IsActive from false to true again.

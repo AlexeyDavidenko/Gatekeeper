@@ -15,9 +15,11 @@ else
     <form method="post" action="/questions/@_question.Id/save">
         <AntiforgeryToken />
         <RichTextEditor Name="promptText" Value="@_question.PromptText" />
+        <p class="muted">@T["web.questions.prompt_en_label"]</p>
+        <RichTextEditor Name="promptTextEn" Value="@_question.PromptTextEn" Required="false" />
         <label><input type="checkbox" name="isRequired" value="true" checked="@_question.IsRequired" /> @T["web.questions.required_checkbox"]</label>
         <label><input type="checkbox" name="isActive" value="true" checked="@_question.IsActive" /> @T["web.questionedit.active_checkbox"]</label>
-        <QuestionTypeEditor Type="@_question.Type" Options="@_question.Options" />
+        <QuestionTypeEditor Type="@_question.Type" Options="@_question.Options" OptionsEn="@_question.OptionsEn" />
         <button type="submit" class="approve">@T["web.questionedit.save_button"]</button>
     </form>
 }
