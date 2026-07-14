@@ -38,14 +38,14 @@ else
             </PropertyColumn>
             @if (_isOwner)
             {
-                <TemplateColumn Sortable="false" Title="@ByLabel">
+                <TemplateColumn Sortable="false" Title="@ByLabel" HeaderClass="hide-on-mobile" CellClass="hide-on-mobile">
                     <CellTemplate>
                         @{ var decision = _decisions.GetValueOrDefault(context.Item.Id); }
                         @(decision?.PerformedByName ?? decision?.PerformedByUserId.ToString() ?? T["common.empty_dash"])
                     </CellTemplate>
                 </TemplateColumn>
-                <TemplateColumn Sortable="false" Title="@SourceLabel">
-                    <CellTemplate>@(_decisions.GetValueOrDefault(context.Item.Id)?.Source ?? T["common.empty_dash"])</CellTemplate>
+                <TemplateColumn Sortable="false" Title="@SourceLabel" HeaderClass="hide-on-mobile" CellClass="hide-on-mobile">
+                    <CellTemplate>@SourceText(_decisions.GetValueOrDefault(context.Item.Id)?.Source)</CellTemplate>
                 </TemplateColumn>
             }
             <TemplateColumn Sortable="false" Title="">
@@ -56,7 +56,8 @@ else
             </TemplateColumn>
         </Columns>
         <PagerContent>
-            <MudDataGridPager T="ApplicationSummary" />
+            <MudDataGridPager T="ApplicationSummary" RowsPerPageString="@T["web.common.pager.rows_per_page"]"
+                              InfoFormat="@T["web.common.pager.info_format"]" AllItemsText="@T["web.common.pager.all_items"]" />
         </PagerContent>
     </MudDataGrid>
 }
@@ -64,13 +65,14 @@ else
 <AuthorizeView Context="archiveContext" Roles="Owner">
     <Authorized>
         <h2>@T["web.history.archive_title"]</h2>
-        <form method="post" action="history/archive" class="inline">
-            <AntiforgeryToken />
-            <label>@T["web.history.archive_older_than_label"]
-                <input type="date" name="olderThan" required />
-            </label>
-            <button type="submit" class="approve">@T["web.history.archive_button"]</button>
-        </form>
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudDatePicker @bind-Date="_archiveOlderThan" Label="@T["web.history.archive_older_than_label"]"
+                           DateFormat="dd.MM.yyyy" Style="min-width: 280px; max-width: 320px;" />
+            <MudButton Variant="Variant.Filled" Color="Color.Success" Disabled="@(_archiveOlderThan is null)"
+                       OnClick="ArchiveAsync">
+                @T["web.history.archive_button"]
+            </MudButton>
+        </div>
         @if (Archived is not null)
         {
             <p class="muted">@T["web.history.archived_count"]: @Archived</p>
@@ -78,11 +80,11 @@ else
 
         @if (IncludeArchived)
         {
-            <a href="/history">@T["web.history.hide_archived_link"]</a>
+            <MudButton Variant="Variant.Text" Href="/history" Class="mt-2">@T["web.history.hide_archived_link"]</MudButton>
         }
         else
         {
-            <a href="/history?includeArchived=true">@T["web.history.show_archived_link"]</a>
+            <MudButton Variant="Variant.Text" Href="/history?includeArchived=true" Class="mt-2">@T["web.history.show_archived_link"]</MudButton>
         }
 
         @if (IncludeArchived)
@@ -127,7 +129,8 @@ else
                         </TemplateColumn>
                     </Columns>
                     <PagerContent>
-                        <MudDataGridPager T="ModerationLogEntry" />
+                        <MudDataGridPager T="ModerationLogEntry" RowsPerPageString="@T["web.common.pager.rows_per_page"]"
+                                          InfoFormat="@T["web.common.pager.info_format"]" AllItemsText="@T["web.common.pager.all_items"]" />
                     </PagerContent>
                 </MudDataGrid>
             }
@@ -141,6 +144,7 @@ else
     private bool IncludeArchived;
     private int? Archived;
     private bool _isOwner;
+    private DateTime? _archiveOlderThan;
 
     private IReadOnlyList<ApplicationSummary>? _apps;
     private Dictionary<long, ModerationLogEntry> _decisions = [];
@@ -175,6 +179,14 @@ else
         await LoadAsync();
     }
 
+    private string SourceText(string? source) => source switch
+    {
+        "TelegramGroup" => T["web.history.source.telegram_group"],
+        "Web" => T["web.history.source.web"],
+        "System" => T["web.history.source.system"],
+        _ => T["common.empty_dash"],
+    };
+
     private async Task LoadAsync()
     {
         var approved = await Api.GetByStatusAsync("Approved");
@@ -197,6 +209,13 @@ else
             var full = await Api.GetAuditLogAsync(includeArchived: true);
             _archived = full.Where(e => e.IsArchived).OrderByDescending(e => e.ArchivedAt).ToList();
         }
+    }
+
+    private async Task ArchiveAsync()
+    {
+        if (_archiveOlderThan is not { } date) return;
+        Archived = await Api.ArchiveModerationActionsAsync(new DateTimeOffset(date, TimeSpan.Zero));
+        await LoadAsync();
     }
 
     private async Task RestoreAsync(long id)

@@ -43,15 +43,33 @@ else
         <MudItem xs="12" md="8">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">@T["web.dashboard.trend_title"]</MudText>
-                <MudChart ChartType="ChartType.Line" ChartSeries="@_trendSeries" ChartLabels="@_trendLabels"
-                          Width="100%" Height="300px" />
+                @if (_hasTrendData)
+                {
+                    <MudChart ChartType="ChartType.Line" ChartSeries="@_trendSeries" ChartLabels="@_trendLabels"
+                              Width="100%" Height="300px" />
+                }
+                else
+                {
+                    <MudText Class="d-flex align-center justify-center mud-text-secondary" Style="height: 300px;">
+                        @T["web.dashboard.no_chart_data"]
+                    </MudText>
+                }
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">@T["web.dashboard.status_ratio_title"]</MudText>
-                <MudChart ChartType="ChartType.Donut" ChartSeries="@_statusSeries" ChartLabels="@_statusLabels"
-                          Width="100%" Height="300px" />
+                @if (_hasStatusData)
+                {
+                    <MudChart ChartType="ChartType.Donut" ChartSeries="@_statusSeries" ChartLabels="@_statusLabels"
+                              Width="100%" Height="300px" />
+                }
+                else
+                {
+                    <MudText Class="d-flex align-center justify-center mud-text-secondary" Style="height: 300px;">
+                        @T["web.dashboard.no_chart_data"]
+                    </MudText>
+                }
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -87,6 +105,8 @@ else
     private string[] _trendLabels = [];
     private List<ChartSeries<double>> _statusSeries = [];
     private string[] _statusLabels = [];
+    private bool _hasTrendData;
+    private bool _hasStatusData;
 
     private string WhenLabel => T["web.dashboard.when_column"];
     private string UserLabel => T["web.dashboard.user_column"];
@@ -121,5 +141,8 @@ else
                 Data = new ChartData<double>((IReadOnlyList<double>)[_summary.PendingCount, _summary.ApprovedWeek, _summary.RejectedWeek]),
             },
         ];
+
+        _hasTrendData = _summary.Trend.Any(t => t.Approved > 0 || t.Rejected > 0);
+        _hasStatusData = _summary.PendingCount > 0 || _summary.ApprovedWeek > 0 || _summary.RejectedWeek > 0;
     }
 }

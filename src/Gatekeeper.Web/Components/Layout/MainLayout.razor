@@ -30,9 +30,16 @@
         </span>
         <AuthorizeView Context="authContext">
             <Authorized>
-                <MudMenu Class="ml-4" ListClass="pa-2" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                @* @bind-Open + our own @onclick on the activator content drive this, instead of
+                   relying purely on MudMenu's built-in click wiring — that wiring never toggled
+                   _openState in live testing (verified: the activator div receives the click at the
+                   DOM level, but MudMenu's own handler never ran), so this sidesteps whatever's
+                   wrong with it while keeping the activator content as the popover's anchor point. *@
+                <MudMenu @bind-Open="_userMenuOpen" Class="ml-4" ListClass="pa-2" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                     <ActivatorContent>
-                        <Avatar DisplayName="@authContext.User.Identity?.Name" Username="@authContext.User.FindFirst("tg_username")?.Value" />
+                        <div @onclick="@(() => _userMenuOpen = !_userMenuOpen)" @onclick:stopPropagation="true" style="cursor: pointer;">
+                            <Avatar DisplayName="@authContext.User.Identity?.Name" Username="@authContext.User.FindFirst("tg_username")?.Value" />
+                        </div>
                     </ActivatorContent>
                     <ChildContent>
                         <MudText Typo="Typo.subtitle2" Class="px-4 pb-2">@authContext.User.Identity?.Name</MudText>
@@ -77,6 +84,7 @@
 @code {
     private bool _isDarkMode;
     private bool _drawerOpen = true;
+    private bool _userMenuOpen;
     private string _previousPath = "/";
 
     private readonly MudTheme _theme = new()

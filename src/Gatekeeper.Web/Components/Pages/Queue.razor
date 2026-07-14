@@ -49,14 +49,15 @@ else
                     <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
                                    title="@T["web.detail.approve_button"]" OnClick="@(() => DecideAsync(context.Item, approve: true))" />
                     <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
-                                   title="@T["web.detail.reject_button"]" OnClick="@(() => DecideAsync(context.Item, approve: false))" />
+                                   title="@T["web.detail.reject_button"]" OnClick="@(() => ConfirmRejectAsync(context.Item))" />
                     <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
                                    title="@T["web.queue.open_link"]" OnClick="@(() => OpenDialogAsync(context.Item.Id))" />
                 </CellTemplate>
             </TemplateColumn>
         </Columns>
         <PagerContent>
-            <MudDataGridPager T="ApplicationSummary" />
+            <MudDataGridPager T="ApplicationSummary" RowsPerPageString="@T["web.common.pager.rows_per_page"]"
+                              InfoFormat="@T["web.common.pager.info_format"]" AllItemsText="@T["web.common.pager.all_items"]" />
         </PagerContent>
     </MudDataGrid>
 }
@@ -84,6 +85,18 @@ else
         return a.Id.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase)
             || (a.DisplayName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false)
             || (a.Username?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    // Reject is the harder-to-undo of the two (an approve mistake can just be reverted through
+    // the same flow; a reject also declines the Telegram join request outright) — confirm before
+    // acting. Approve stays one click.
+    private async Task ConfirmRejectAsync(ApplicationSummary app)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            T["web.detail.reject_button"], T["web.queue.confirm_reject"],
+            yesText: T["web.detail.reject_button"], cancelText: T["web.common.cancel"]);
+        if (confirmed == true)
+            await DecideAsync(app, approve: false);
     }
 
     // One-click accept/reject with no reason — a reason field is only offered in the fuller dialog

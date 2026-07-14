@@ -19,11 +19,11 @@
             <p class="muted">@T["web.questions.prompt_en_label"]</p>
             <RichTextEditor @ref="_promptEditorEn" Name="promptTextEn" Value="@_promptTextEn" Required="false" />
             <MudCheckBox T="bool" Value="_isRequired" ValueChanged="@((bool v) => _isRequired = v)"
-                         Label="@T["web.questions.required_checkbox"]" Class="mt-2" />
+                         Label="@T["web.questions.required_checkbox"]" Color="Color.Primary" Class="mt-2" />
             @if (IsEdit)
             {
                 <MudCheckBox T="bool" Value="_isActive" ValueChanged="@((bool v) => _isActive = v)"
-                             Label="@T["web.questionedit.active_checkbox"]" />
+                             Label="@T["web.questionedit.active_checkbox"]" Color="Color.Primary" />
             }
             <QuestionTypeEditor @ref="_typeEditor" Type="@_type" Options="@_options" OptionsEn="@_optionsEn" />
         }

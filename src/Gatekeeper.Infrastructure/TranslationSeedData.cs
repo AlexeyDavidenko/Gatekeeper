@@ -191,6 +191,8 @@ public static class TranslationSeedData
         ("web.dashboard.trend_title", "en", "Decisions over 14 days"),
         ("web.dashboard.status_ratio_title", "ru", "Соотношение статусов"),
         ("web.dashboard.status_ratio_title", "en", "Status ratio"),
+        ("web.dashboard.no_chart_data", "ru", "Нет данных за период"),
+        ("web.dashboard.no_chart_data", "en", "No data for this period"),
         ("web.dashboard.week_label_approved", "ru", "Одобрено за неделю"),
         ("web.dashboard.week_label_approved", "en", "Approved this week"),
         ("web.dashboard.week_label_rejected", "ru", "Отклонено за неделю"),
@@ -223,6 +225,8 @@ public static class TranslationSeedData
         ("web.queue.submitted_column", "en", "Submitted"),
         ("web.queue.open_link", "ru", "Открыть"),
         ("web.queue.open_link", "en", "Open"),
+        ("web.queue.confirm_reject", "ru", "Отклонить эту заявку? Это действие отклонит запрос на вступление в Telegram."),
+        ("web.queue.confirm_reject", "en", "Reject this application? This will decline the Telegram join request."),
 
         // --- Web: Detail.razor -------------------------------------------------------------------
         ("web.detail.back_to_queue", "ru", "← к очереди"),
@@ -283,6 +287,12 @@ public static class TranslationSeedData
         ("web.history.by_column", "en", "By"),
         ("web.history.source_column", "ru", "Откуда"),
         ("web.history.source_column", "en", "Source"),
+        ("web.history.source.telegram_group", "ru", "Из группы"),
+        ("web.history.source.telegram_group", "en", "From group"),
+        ("web.history.source.web", "ru", "С сайта"),
+        ("web.history.source.web", "en", "From web"),
+        ("web.history.source.system", "ru", "Системой"),
+        ("web.history.source.system", "en", "System"),
         ("web.history.application_column", "ru", "Заявка"),
         ("web.history.application_column", "en", "Application"),
         ("web.history.archived_at_column", "ru", "Заархивировано"),
@@ -315,6 +325,12 @@ public static class TranslationSeedData
         ("web.common.cancel", "en", "Cancel"),
         ("web.common.search", "ru", "Поиск"),
         ("web.common.search", "en", "Search"),
+        ("web.common.pager.rows_per_page", "ru", "Строк на странице:"),
+        ("web.common.pager.rows_per_page", "en", "Rows per page:"),
+        ("web.common.pager.info_format", "ru", "{first_item}-{last_item} из {all_items}"),
+        ("web.common.pager.info_format", "en", "{first_item}-{last_item} of {all_items}"),
+        ("web.common.pager.all_items", "ru", "Все"),
+        ("web.common.pager.all_items", "en", "All"),
 
         // --- Web: Questions.razor ----------------------------------------------------------------
         ("web.questions.title", "ru", "Вопросы анкеты"),

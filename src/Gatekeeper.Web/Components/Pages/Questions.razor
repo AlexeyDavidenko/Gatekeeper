@@ -54,7 +54,8 @@ else
             </TemplateColumn>
         </Columns>
         <PagerContent>
-            <MudDataGridPager T="QuestionDto" />
+            <MudDataGridPager T="QuestionDto" RowsPerPageString="@T["web.common.pager.rows_per_page"]"
+                              InfoFormat="@T["web.common.pager.info_format"]" AllItemsText="@T["web.common.pager.all_items"]" />
         </PagerContent>
     </MudDataGrid>
 }

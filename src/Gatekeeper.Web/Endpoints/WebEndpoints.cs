@@ -95,20 +95,8 @@ public static class WebEndpoints
         // Question management (create/edit/move/deactivate) now all calls AdminApiClient directly
         // in-circuit from Questions.razor/QuestionDialog.razor — no form posts, no routes needed.
 
-        // Moderation-log archiving form posts (History.razor, Owner-only control) — same
-        // auth/antiforgery shape as decisions/questions above.
-        var history = app.MapGroup("/history").RequireAuthorization();
-        history.MapPost("/archive", async (HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct) =>
-        {
-            await ValidateAsync(af, ctx);
-            var form = await ctx.Request.ReadFormAsync(ct);
-            if (!DateTimeOffset.TryParse(form["olderThan"], out var olderThan))
-                return Results.Redirect("/history?includeArchived=true");
-            var count = await api.ArchiveModerationActionsAsync(olderThan, ct);
-            return Results.Redirect($"/history?includeArchived=true&archived={count}");
-        });
-        // Single/bulk restore now call AdminApiClient directly in-circuit from History.razor's
-        // MudDataGrid row action / bulk-select button — no form post, no route needed for them.
+        // Moderation-log archiving (History.razor, Owner-only control) — archive/restore/bulk-restore
+        // all call AdminApiClient directly in-circuit now, no form posts, no routes needed for them.
 
         // /translations editor (Owner-only, enforced by the page itself — this form post shares its
         // route prefix but the antiforgery+auth cookie already gates it the same way). Refreshes

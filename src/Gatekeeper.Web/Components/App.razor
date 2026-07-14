@@ -105,6 +105,14 @@
                wrap hack, it now only ever holds the hamburger/brand/lang-switch/user, which always
                fits on one line. */
             .mud-grid-item-sm-6, .mud-grid-item-md-3 { max-width: 100%; flex-basis: 100%; }
+
+            /* Secondary MudDataGrid columns (e.g. History's Owner-only "Кем"/"Откуда") opt into
+               this via HeaderClass/CellClass — collapses the whole cell, not just its content, so
+               the grid doesn't leave empty gaps on narrow screens. MudBlazor's own responsive
+               table mode (.mud-xs-table .mud-table-cell) sets display:flex at this same
+               breakpoint with higher specificity (compound selector beats our single class), so
+               this needs !important to actually win. */
+            .hide-on-mobile { display: none !important; }
         }
     </style>
     <HeadOutlet />

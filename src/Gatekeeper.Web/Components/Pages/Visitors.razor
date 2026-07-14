@@ -35,14 +35,33 @@ else
             <PropertyColumn Property="x => x.StatusCode" Title="@StatusLabel" />
             <PropertyColumn Property="x => x.DurationMs" Title="@MsLabel" />
             <TemplateColumn Sortable="false" Title="@ReferrerLabel">
-                <CellTemplate><span class="truncate" title="@context.Item.Referrer">@(context.Item.Referrer ?? T["common.empty_dash"])</span></CellTemplate>
+                <CellTemplate>
+                    @if (context.Item.Referrer is null)
+                    {
+                        @T["common.empty_dash"]
+                    }
+                    else
+                    {
+                        <MudTooltip Text="@context.Item.Referrer"><span class="truncate">@context.Item.Referrer</span></MudTooltip>
+                    }
+                </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Sortable="false" Title="User-Agent">
-                <CellTemplate><span class="truncate" title="@context.Item.UserAgent">@(context.Item.UserAgent ?? T["common.empty_dash"])</span></CellTemplate>
+                <CellTemplate>
+                    @if (context.Item.UserAgent is null)
+                    {
+                        @T["common.empty_dash"]
+                    }
+                    else
+                    {
+                        <MudTooltip Text="@context.Item.UserAgent"><span class="truncate">@context.Item.UserAgent</span></MudTooltip>
+                    }
+                </CellTemplate>
             </TemplateColumn>
         </Columns>
         <PagerContent>
-            <MudDataGridPager T="SiteVisitDto" />
+            <MudDataGridPager T="SiteVisitDto" RowsPerPageString="@T["web.common.pager.rows_per_page"]"
+                              InfoFormat="@T["web.common.pager.info_format"]" AllItemsText="@T["web.common.pager.all_items"]" />
         </PagerContent>
     </MudDataGrid>
 }
