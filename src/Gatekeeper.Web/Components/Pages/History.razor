@@ -3,6 +3,7 @@
 @inject AdminApiClient Api
 @inject NavigationManager Nav
 @inject Translator T
+@inject IDialogService DialogService
 
 <h1>@T["web.history.title"]</h1>
 
@@ -50,7 +51,7 @@ else
             <TemplateColumn Sortable="false" Title="">
                 <CellTemplate>
                     <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
-                                   Href="@($"applications/{context.Item.Id}")" title="@T["web.queue.open_link"]" />
+                                   title="@T["web.queue.open_link"]" OnClick="@(() => OpenDialogAsync(context.Item.Id))" />
                 </CellTemplate>
             </TemplateColumn>
         </Columns>
@@ -209,5 +210,15 @@ else
         await Api.UnarchiveModerationActionsAsync(_selectedArchived.Select(e => e.Id).ToList());
         _selectedArchived = [];
         await LoadAsync();
+    }
+
+    private async Task OpenDialogAsync(long applicationId)
+    {
+        var parameters = new DialogParameters<ApplicationDetailDialog> { { d => d.ApplicationId, applicationId } };
+        var dialog = await DialogService.ShowAsync<ApplicationDetailDialog>(
+            $"{T["web.detail.application_title"]} #{applicationId}", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAsync();
     }
 }

@@ -12,10 +12,15 @@
 }
 else
 {
+    <MudTextField T="string" Value="_searchString" ValueChanged="OnSearchChanged"
+                  Placeholder="@T["web.common.search"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Class="mb-2" />
+
     <MudExpansionPanels>
-        @foreach (var group in _groups)
+        @foreach (var group in FilteredGroups())
         {
-            <MudExpansionPanel Text="@group.Prefix">
+            <MudExpansionPanel Text="@group.Prefix" Expanded="@GetExpanded(group.Prefix)"
+                                ExpandedChanged="@((bool v) => _expanded[group.Prefix] = v)">
                 @foreach (var row in group.Rows)
                 {
                     <form method="post" action="translations/save" class="translation-row">
@@ -41,6 +46,8 @@ else
     private sealed record Group(string Prefix, List<Row> Rows);
 
     private List<Group>? _groups;
+    private string _searchString = "";
+    private readonly Dictionary<string, bool> _expanded = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -60,4 +67,43 @@ else
             .Select(g => new Group(g.Key, g.ToList()))
             .ToList();
     }
+
+    private bool GetExpanded(string prefix) => _expanded.GetValueOrDefault(prefix);
+
+    private void OnSearchChanged(string value)
+    {
+        _searchString = value;
+        if (string.IsNullOrWhiteSpace(value)) return;
+
+        // Force-expand every panel that has at least one match — jumps the admin straight to the
+        // key they're looking for instead of them having to open ~40 panels by hand.
+        foreach (var group in _groups ?? [])
+        {
+            if (group.Rows.Any(Matches))
+                _expanded[group.Prefix] = true;
+        }
+    }
+
+    // Only the matching rows render inside a matching panel — keeps the search result focused on
+    // exactly what was typed rather than showing the whole (possibly large) group alongside it.
+    private IEnumerable<Group> FilteredGroups()
+    {
+        if (_groups is null) yield break;
+        if (string.IsNullOrWhiteSpace(_searchString))
+        {
+            foreach (var g in _groups) yield return g;
+            yield break;
+        }
+
+        foreach (var group in _groups)
+        {
+            var matches = group.Rows.Where(Matches).ToList();
+            if (matches.Count > 0) yield return group with { Rows = matches };
+        }
+    }
+
+    private bool Matches(Row row) =>
+        row.Key.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+        || (row.Ru?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (row.En?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
 }

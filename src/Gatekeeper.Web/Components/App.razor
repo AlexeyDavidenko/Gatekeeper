@@ -48,7 +48,10 @@
         a, .btn-link { color: var(--link); }
         h1 { font-size: 1.5rem; margin: 1rem 0; }
         h2 { font-size: 1.15rem; margin: 1.75rem 0 .75rem; }
-        .page { max-width: 860px; margin: 0 auto; padding: 0 1rem 3rem; }
+        /* No max-width/margin:auto here on purpose — MudDrawer already reserves its own space on the
+           left, so the rest should just fill whatever's left of the viewport (grids, charts, dialogs
+           all benefit from the extra room instead of sitting in a narrow centered column). */
+        .page { padding: 1.5rem 2rem 3rem; }
         .user { opacity: .7; font-size: .9rem; }
         .inline { display: inline; }
         button.link { background: none; border: none; color: var(--link); cursor: pointer; padding: 0; font-size: 1rem; }
@@ -71,16 +74,13 @@
         .avatar-fallback { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: .8rem; }
         .avatar-lg { width: 72px; height: 72px; font-size: 1.5rem; }
         .bio { opacity: .8; font-style: italic; }
-        .rte { border: 1px solid var(--border); border-radius: .375rem; overflow: hidden; }
+        /* Border/radius now come from the borrowed mud-paper-outlined class (see RichTextEditor.razor) —
+           just clip the toolbar's background corners to match. */
+        .rte { overflow: hidden; }
         .rte-toolbar { display: flex; gap: .25rem; padding: .3rem; border-bottom: 1px solid var(--border); background: var(--card-bg); }
-        .rte-toolbar button { background: none; border: 1px solid transparent; border-radius: .25rem; padding: .25rem .5rem; cursor: pointer; font-size: .9rem; color: inherit; line-height: 1; }
-        .rte-toolbar button:hover { border-color: var(--border); }
         .rte-editor { padding: .45rem .5rem; min-height: 1.4rem; outline: none; }
         .rte-editor a { color: var(--link); }
         .truncate { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .q-options { margin: .5rem 0; }
-        .q-option-row { display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
-        .q-option-row input[type=text] { flex: 1; }
         .widget { max-width: 100%; overflow-x: auto; }
         .lang-switch { margin-left: .75rem; font-size: .9rem; opacity: .7; }
         .lang-switch a { text-decoration: none; }
@@ -116,6 +116,5 @@
     <script src="js/theme.js"></script>
     <script src="js/localtime.js"></script>
     <script src="js/richtext.js"></script>
-    <script src="js/questionoptions.js"></script>
 </body>
 </html>

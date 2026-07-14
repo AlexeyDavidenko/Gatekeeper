@@ -1,8 +1,8 @@
 @* Create/edit a survey question — replaces the old inline add-form on Questions.razor and the
-   separate QuestionEdit.razor page/route. QuestionId null = create mode. Prompt/options values are
-   collected explicitly from RichTextEditor/QuestionTypeEditor right before saving (see those
-   components' CollectAsync/GetValueAsync doc comments) since this dialog submits via a button
-   click, not a native <form> POST. *@
+   separate QuestionEdit.razor page/route. QuestionId null = create mode. Prompt text is collected
+   explicitly from RichTextEditor (still contenteditable-backed, needs a JS round-trip) right before
+   saving; QuestionTypeEditor's type/options are plain Blazor state, read synchronously via
+   Collect(). *@
 @inject AdminApiClient Api
 @inject Translator T
 
@@ -81,7 +81,7 @@
         var promptText = RichTextSanitizer.Sanitize(await _promptEditor!.GetValueAsync());
         var promptTextEnRaw = await _promptEditorEn!.GetValueAsync();
         var promptTextEn = string.IsNullOrWhiteSpace(promptTextEnRaw) ? null : RichTextSanitizer.Sanitize(promptTextEnRaw);
-        var (type, options, optionsEn) = await _typeEditor!.CollectAsync();
+        var (type, options, optionsEn) = _typeEditor!.Collect();
 
         if (QuestionId is { } id)
             await Api.EditQuestionAsync(id, type, promptText, _isRequired, options, _isActive, promptTextEn, optionsEn);

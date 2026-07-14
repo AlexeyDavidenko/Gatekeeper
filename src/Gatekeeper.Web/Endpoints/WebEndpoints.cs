@@ -87,16 +87,10 @@ public static class WebEndpoints
             }
         }).RequireAuthorization();
 
-        // Decision form posts — require auth + a valid antiforgery token.
-        var apps = app.MapGroup("/applications").RequireAuthorization();
-        apps.MapPost("/{id:long}/approve", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
-            => DecideAsync(id, approve: true, ctx, api, af, ct));
-        apps.MapPost("/{id:long}/reject", (long id, HttpContext ctx, AdminApiClient api, IAntiforgery af, CancellationToken ct)
-            => DecideAsync(id, approve: false, ctx, api, af, ct));
-
-        // Ban/Mute/Kick/Warn now opens a MudDialog (ModerationDialog.razor) from Detail.razor and
-        // calls AdminApiClient.ModerateAsync/AttachEvidenceAsync directly in-circuit — no form post,
-        // no route needed for it.
+        // Approve/Reject now opens ApplicationDetailDialog (from Queue.razor/History.razor) or uses
+        // its own inline grid actions, both calling AdminApiClient.DecideAsync directly in-circuit —
+        // no form post, no route needed for them. Same for Ban/Mute/Kick/Warn (ModerationDialog.razor,
+        // AdminApiClient.ModerateAsync/AttachEvidenceAsync).
 
         // Question management (create/edit/move/deactivate) now all calls AdminApiClient directly
         // in-circuit from Questions.razor/QuestionDialog.razor — no form posts, no routes needed.
@@ -140,29 +134,9 @@ public static class WebEndpoints
         return app;
     }
 
-    private static async Task<IResult> DecideAsync(
-        long id, bool approve, HttpContext ctx, AdminApiClient api, IAntiforgery antiforgery, CancellationToken ct)
-    {
-        await ValidateAsync(antiforgery, ctx);
-
-        var form = await ctx.Request.ReadFormAsync(ct);
-        if (!uint.TryParse(form["rowVersion"], out var rowVersion))
-            return Results.BadRequest("Missing rowVersion.");
-
-        var (userId, name) = CurrentUser(ctx);
-        var outcome = await api.DecideAsync(id, rowVersion, approve, form["reason"], userId, name, ct);
-        return Results.Redirect(outcome == DecisionOutcome.AlreadyDecided ? "/queue?notice=conflict" : "/queue");
-    }
-
     private static async Task ValidateAsync(IAntiforgery antiforgery, HttpContext ctx)
     {
         try { await antiforgery.ValidateRequestAsync(ctx); }
         catch (AntiforgeryValidationException) { throw new BadHttpRequestException("Invalid antiforgery token."); }
-    }
-
-    private static (long UserId, string? Name) CurrentUser(HttpContext ctx)
-    {
-        var id = long.TryParse(ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
-        return (id, ctx.User.Identity?.Name);
     }
 }

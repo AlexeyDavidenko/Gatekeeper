@@ -38,7 +38,7 @@ public sealed record AdminCallbackRequest(
 
 public sealed record ApplicationSummary(
     long Id, long TelegramUserId, string? Username, string? DisplayName,
-    string Status, DateTimeOffset? SubmittedAt, string? PhotoFileId);
+    string Status, DateTimeOffset? SubmittedAt, string? PhotoFileId, uint RowVersion = 0);
 
 public sealed record ApplicationCard(
     long Id, long TelegramUserId, long ChatId, string? Username, string? DisplayName,

@@ -1,69 +1,66 @@
-@* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Add/remove
-   rows and the type-select's show/hide toggle are handled client-side by
-   wwwroot/js/questionoptions.js — the type value and option rows are collected explicitly via
-   CollectAsync() right before saving (QuestionDialog.razor), since there's no native <form> POST
-   here to serialize them. Captcha isn't offered — no rendering or answer-parsing exists for it yet. *@
-@inject IJSRuntime JS
+@* Type selector + dynamic option-list editor for SingleChoice/MultiChoice questions. Real
+   Blazor-bound state (MudSelect + a List<(Ru,En)> rendered as MudTextField rows) — no JS DOM
+   scraping needed, unlike the old native <select>/<input> version. Collect() (synchronous — just
+   reads local state) is called by QuestionDialog.razor right before saving. Captcha isn't offered —
+   no rendering or answer-parsing exists for it yet. *@
 @inject Translator T
 
-<div @ref="_container">
-    <label>@T["web.qtype.label"]:
-        <select class="q-type-select">
-            <option value="Text" selected="@(Type == "Text")">@T["web.qtype.text"]</option>
-            <option value="SingleChoice" selected="@(Type == "SingleChoice")">@T["web.qtype.single_choice"]</option>
-            <option value="MultiChoice" selected="@(Type == "MultiChoice")">@T["web.qtype.multi_choice"]</option>
-        </select>
-    </label>
-    <div class="q-options" hidden="@(Type is not ("SingleChoice" or "MultiChoice"))">
-        <p class="muted">@T["web.qtype.options_label"]</p>
-        <div class="q-options-list">
-            @if (Options is not null)
-            {
-                @for (var i = 0; i < Options.Count; i++)
-                {
-                    var opt = Options[i];
-                    var optEn = OptionsEn is not null && i < OptionsEn.Count ? OptionsEn[i] : null;
-                    <div class="q-option-row">
-                        <input type="text" name="options" value="@opt" />
-                        <input type="text" name="optionsEn" value="@optEn" placeholder="EN" />
-                        <button type="button" class="link q-remove-option">✕</button>
-                    </div>
-                }
-            }
+<MudSelect T="string" Value="_type" ValueChanged="OnTypeChanged" Label="@T["web.qtype.label"]" Class="mt-2">
+    <MudSelectItem Value="@("Text")">@T["web.qtype.text"]</MudSelectItem>
+    <MudSelectItem Value="@("SingleChoice")">@T["web.qtype.single_choice"]</MudSelectItem>
+    <MudSelectItem Value="@("MultiChoice")">@T["web.qtype.multi_choice"]</MudSelectItem>
+</MudSelect>
+
+@if (_type is "SingleChoice" or "MultiChoice")
+{
+    <p class="muted mt-2">@T["web.qtype.options_label"]</p>
+    @for (var i = 0; i < _rows.Count; i++)
+    {
+        var idx = i;
+        <div class="d-flex gap-2 align-center my-1">
+            <MudTextField T="string" Value="@_rows[idx].Ru" ValueChanged="@((string v) => UpdateRu(idx, v))" />
+            <MudTextField T="string" Value="@_rows[idx].En" ValueChanged="@((string v) => UpdateEn(idx, v))" Placeholder="EN" />
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => RemoveRow(idx))" />
         </div>
-        <button type="button" class="link q-add-option">@T["web.qtype.add_option"]</button>
-    </div>
-</div>
+    }
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" OnClick="AddRow" Class="mt-1">
+        @T["web.qtype.add_option"]
+    </MudButton>
+}
 
 @code {
     [Parameter] public string Type { get; set; } = "Text";
     [Parameter] public IReadOnlyList<string>? Options { get; set; }
     [Parameter] public IReadOnlyList<string>? OptionsEn { get; set; }
 
-    private ElementReference _container;
+    private string _type = "Text";
+    private List<(string Ru, string En)> _rows = [];
 
-    private sealed record CollectResult(string Type, IReadOnlyList<string> Options, IReadOnlyList<string> OptionsEn);
-
-    // Driven by this component's own render lifecycle, not a document-level DOMContentLoaded/
-    // enhancedload listener — see the comment in LocalTime.razor for why (navigation happens over
-    // the interactive Server circuit, which never fires either of those page-load events).
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (firstRender)
-            await JS.InvokeVoidAsync("gatekeeperQuestionOptions.init", _container);
+        _type = Type;
+        _rows = Options is null
+            ? []
+            : Options.Select((opt, i) => (opt, OptionsEn is not null && i < OptionsEn.Count ? OptionsEn[i] : "")).ToList();
     }
 
-    /// <summary>Reads the currently-selected type plus every RU/EN option-row value straight from
-    /// the DOM (the only place they live — this component tracks none of it in Blazor state).
-    /// Blank rows on both sides are dropped; a row with a RU value but blank EN keeps its RU value
-    /// and an empty EN string (Question.OptionsFor's all-or-nothing count check does the rest).</summary>
-    public async Task<(string Type, IReadOnlyList<string>? Options, IReadOnlyList<string>? OptionsEn)> CollectAsync()
-    {
-        var result = await JS.InvokeAsync<CollectResult>("gatekeeperQuestionOptions.collect", _container);
-        if (result.Type is not ("SingleChoice" or "MultiChoice")) return (result.Type, null, null);
+    private void OnTypeChanged(string value) => _type = value;
 
-        var options = result.Options.Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
-        var optionsEn = result.OptionsEn.Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
-        return (result.Type, options.Count > 0 ? options : null, optionsEn.Count > 0 ? optionsEn : null);
+    private void UpdateRu(int index, string value) => _rows[index] = (value, _rows[index].En);
+    private void UpdateEn(int index, string value) => _rows[index] = (_rows[index].Ru, value);
+    private void AddRow() => _rows.Add(("", ""));
+    private void RemoveRow(int index) => _rows.RemoveAt(index);
+
+    /// <summary>Blank rows on both sides are dropped independently for RU/EN — a row with a RU value
+    /// but a blank EN keeps its RU value and drops out of the EN list entirely, so a partially
+    /// translated option set naturally ends up with mismatched RU/EN counts (Question.OptionsFor's
+    /// all-or-nothing count check falls back to RU in that case — see its own doc comment).</summary>
+    public (string Type, IReadOnlyList<string>? Options, IReadOnlyList<string>? OptionsEn) Collect()
+    {
+        if (_type is not ("SingleChoice" or "MultiChoice")) return (_type, null, null);
+
+        var options = _rows.Select(r => r.Ru.Trim()).Where(r => r.Length > 0).ToList();
+        var optionsEn = _rows.Select(r => r.En.Trim()).Where(r => r.Length > 0).ToList();
+        return (_type, options.Count > 0 ? options : null, optionsEn.Count > 0 ? optionsEn : null);
     }
 }

@@ -28,13 +28,26 @@
             /
             <a href="@LangUrl("en")" class="@(Locale.LanguageCode == "en" ? "active" : null)">EN</a>
         </span>
-        <AuthorizeView>
+        <AuthorizeView Context="authContext">
             <Authorized>
-                <span class="user ml-4">@context.User.Identity?.Name</span>
-                <form method="post" action="auth/logout" class="inline">
-                    <AntiforgeryToken />
-                    <button type="submit" class="link">@T["web.nav.logout"]</button>
-                </form>
+                <MudMenu Class="ml-4" ListClass="pa-2" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <ActivatorContent>
+                        <Avatar DisplayName="@authContext.User.Identity?.Name" Username="@authContext.User.FindFirst("tg_username")?.Value" />
+                    </ActivatorContent>
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Class="px-4 pb-2">@authContext.User.Identity?.Name</MudText>
+                        <MudDivider Class="mb-2" />
+                        <MudMenuItem>
+                            <form method="post" action="auth/logout" class="inline">
+                                <AntiforgeryToken />
+                                <button type="submit" class="link d-flex align-center gap-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />
+                                    @T["web.nav.logout"]
+                                </button>
+                            </form>
+                        </MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
             </Authorized>
         </AuthorizeView>
     </MudAppBar>

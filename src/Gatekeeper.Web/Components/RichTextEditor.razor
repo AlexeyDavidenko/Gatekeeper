@@ -1,18 +1,24 @@
 @* Minimal WYSIWYG editor restricted to the tags Telegram's ParseMode.Html actually renders —
    bold/italic/underline/strikethrough/code/links. No block elements: question prompts are
    single-line, so Enter is suppressed client-side (see richtext.js) rather than dealing with
-   <div>/<br> vs literal "\n" conversion for something this short. *@
+   <div>/<br> vs literal "\n" conversion for something this short.
+
+   The wrapper stays a plain <div> (not <MudPaper>) because JS interop needs a raw ElementReference,
+   and @ref on a MudBlazor *component* binds the component instance, not its DOM node — instead it
+   borrows MudBlazor's own "mud-paper"/"mud-paper-outlined" CSS classes so it's visually
+   indistinguishable from a real MudPaper, and the toolbar buttons are real MudIconButtons with
+   Material icons so it doesn't look bolted-on next to the rest of a MudDialog. *@
 @inject IJSRuntime JS
 @inject Translator T
 
-<div class="rte" @ref="_wrapper">
+<div class="rte mud-paper mud-paper-outlined rounded" @ref="_wrapper">
     <div class="rte-toolbar">
-        <button type="button" data-cmd="bold" title="@T["web.rte.bold"]"><b>@T["web.rte.bold_glyph"]</b></button>
-        <button type="button" data-cmd="italic" title="@T["web.rte.italic"]"><i>@T["web.rte.italic_glyph"]</i></button>
-        <button type="button" data-cmd="underline" title="@T["web.rte.underline"]"><u>@T["web.rte.underline_glyph"]</u></button>
-        <button type="button" data-cmd="strikeThrough" title="@T["web.rte.strikethrough"]"><s>@T["web.rte.strikethrough_glyph"]</s></button>
-        <button type="button" data-cmd="code" title="@T["web.rte.code"]">&lt;/&gt;</button>
-        <button type="button" data-cmd="link" title="@T["web.rte.link"]">🔗</button>
+        <MudIconButton type="button" data-cmd="bold" Icon="@Icons.Material.Filled.FormatBold" Size="Size.Small" title="@T["web.rte.bold"]" />
+        <MudIconButton type="button" data-cmd="italic" Icon="@Icons.Material.Filled.FormatItalic" Size="Size.Small" title="@T["web.rte.italic"]" />
+        <MudIconButton type="button" data-cmd="underline" Icon="@Icons.Material.Filled.FormatUnderlined" Size="Size.Small" title="@T["web.rte.underline"]" />
+        <MudIconButton type="button" data-cmd="strikeThrough" Icon="@Icons.Material.Filled.FormatStrikethrough" Size="Size.Small" title="@T["web.rte.strikethrough"]" />
+        <MudIconButton type="button" data-cmd="code" Icon="@Icons.Material.Filled.Code" Size="Size.Small" title="@T["web.rte.code"]" />
+        <MudIconButton type="button" data-cmd="link" Icon="@Icons.Material.Filled.Link" Size="Size.Small" title="@T["web.rte.link"]" />
     </div>
     <div class="rte-editor" contenteditable="true" id="@_id" data-required="@(Required ? "true" : null)">@((MarkupString)(Value ?? ""))</div>
     <input type="hidden" name="@Name" id="@(_id)-input" value="@Value" />

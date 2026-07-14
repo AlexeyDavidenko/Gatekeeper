@@ -1,0 +1,141 @@
+@* Full application review — replaces the old dedicated /applications/{id} page (same as
+   QuestionDialog replaced QuestionEdit.razor). Approve/Reject call AdminApiClient.DecideAsync
+   directly in-circuit instead of a form POST; Moderation still opens ModerationDialog on top. *@
+@using System.Security.Claims
+@inject AdminApiClient Api
+@inject Translator T
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>@T["web.detail.application_title"] #@ApplicationId</TitleContent>
+    <DialogContent>
+        @if (_card is null)
+        {
+            <p>@T["web.common.loading"]</p>
+        }
+        else
+        {
+            <p>
+                <Avatar PhotoFileId="@_card.PhotoFileId" DisplayName="@_card.DisplayName" Username="@_card.Username" Large="true" />
+                @(_card.DisplayName ?? T["common.empty_dash"]) @(_card.Username is null ? "" : $"(@{_card.Username})")
+            </p>
+            <p class="muted">@T["web.detail.status_label"]: @StatusLabel(_card.Status)</p>
+            @if (!string.IsNullOrWhiteSpace(_card.Bio))
+            {
+                <p class="bio">ℹ️ @_card.Bio</p>
+            }
+
+            <div class="answers">
+                @foreach (var ans in _card.Answers)
+                {
+                    <div class="answer">
+                        <div class="q">@ans.Position. @((MarkupString)ans.Prompt)</div>
+                        <div class="a">@(string.IsNullOrWhiteSpace(ans.Text) ? T["common.empty_dash"] : ans.Text)</div>
+                    </div>
+                }
+            </div>
+
+            @if (_card.Status == "AwaitingReview")
+            {
+                <div class="actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => DecideAsync(approve: true))" Disabled="_deciding">
+                        @T["web.detail.approve_button"]
+                    </MudButton>
+                    <MudTextField @bind-Value="_reason" Placeholder="@T["web.detail.reason_placeholder"]" Class="mx-2" Style="max-width: 260px;" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@(() => DecideAsync(approve: false))" Disabled="_deciding">
+                        @T["web.detail.reject_button"]
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <p class="muted">@T["web.detail.already_decided"]</p>
+            }
+
+            @if (_conflict)
+            {
+                <p class="error">@T["web.queue.notice_conflict"]</p>
+            }
+
+            <div class="moderation mt-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Gavel"
+                           OnClick="OpenModerationDialogAsync">
+                    @T["web.detail.moderation_title"]
+                </MudButton>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">@T["web.common.cancel"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthStateTask { get; set; }
+    [Parameter] public long ApplicationId { get; set; }
+
+    private ApplicationCard? _card;
+    private string? _reason;
+    private bool _deciding;
+    private bool _conflict;
+    private bool _changed;
+
+    protected override async Task OnInitializedAsync() => _card = await Api.GetCardAsync(ApplicationId);
+
+    private string StatusLabel(string status) => status switch
+    {
+        "JoinRequested" => T["web.detail.status.join_requested"],
+        "SurveyOffered" => T["web.detail.status.survey_offered"],
+        "InSurvey" => T["web.detail.status.in_survey"],
+        "AwaitingReview" => T["web.detail.status.awaiting_review"],
+        "Approved" => T["web.detail.status.approved"],
+        "Rejected" => T["web.detail.status.rejected"],
+        "Abandoned" => T["web.detail.status.abandoned"],
+        "Cancelled" => T["web.detail.status.cancelled"],
+        _ => status,
+    };
+
+    private async Task DecideAsync(bool approve)
+    {
+        if (_card is null || AuthStateTask is null) return;
+        _deciding = true;
+        var user = (await AuthStateTask).User;
+        var actingUserId = long.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
+
+        var outcome = await Api.DecideAsync(_card.Id, _card.RowVersion, approve, _reason, actingUserId, user.Identity?.Name);
+        if (outcome == DecisionOutcome.AlreadyDecided)
+        {
+            _conflict = true;
+            _deciding = false;
+            return;
+        }
+
+        _changed = true;
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private async Task OpenModerationDialogAsync()
+    {
+        if (_card is null || AuthStateTask is null) return;
+        var user = (await AuthStateTask).User;
+        var actingUserId = long.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
+
+        var parameters = new DialogParameters<ModerationDialog>
+        {
+            { d => d.TelegramUserId, _card.TelegramUserId },
+            { d => d.ChatId, _card.ChatId },
+            { d => d.ActingUserId, actingUserId },
+            { d => d.ActingUserName, user.Identity?.Name },
+        };
+        var dialog = await DialogService.ShowAsync<ModerationDialog>(T["web.detail.moderation_title"], parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            _changed = true;
+            _card = await Api.GetCardAsync(ApplicationId);
+        }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(_changed));
+}

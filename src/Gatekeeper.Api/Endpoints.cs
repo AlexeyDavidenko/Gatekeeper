@@ -186,7 +186,7 @@ public static class ApplicationsEndpoints
             {
                 users.TryGetValue(a.TelegramUserId, out var u);
                 return new ApplicationSummary(a.Id, a.TelegramUserId, u?.Username, Display(u),
-                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId);
+                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId, a.RowVersion);
             }).ToList();
 
             return Results.Ok(result);
@@ -231,7 +231,7 @@ public static class ApplicationsEndpoints
             {
                 users.TryGetValue(a.TelegramUserId, out var u);
                 return new ApplicationSummary(a.Id, a.TelegramUserId, u?.Username, Display(u),
-                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId);
+                    a.Status.ToString(), a.SubmittedAt, u?.PhotoFileId, a.RowVersion);
             }).ToList();
 
             return Results.Ok(result);
