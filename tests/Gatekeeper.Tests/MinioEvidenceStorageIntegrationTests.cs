@@ -13,7 +13,11 @@ namespace Gatekeeper.Tests;
 /// </summary>
 public sealed class MinioFixture : IAsyncLifetime
 {
+    // The official minio/minio image was removed from Docker Hub (404; was still pullable in July 2026), which broke
+    // this fixture's default pull. pgsty/minio is a from-source build of the same server — pinned,
+    // same image AppHost uses for the real deployment.
     private readonly MinioContainer _container = new MinioBuilder()
+        .WithImage("pgsty/minio:RELEASE.2026-08-04T00-00-00Z")
         .WithUsername("test-access-key")
         .WithPassword("test-secret-key")
         .Build();

@@ -44,7 +44,9 @@ var catalogDb = postgres.AddDatabase("catalog");
 // Screenshot-evidence storage for moderation actions (Ban/Mute/Kick/Warn) — file lives here, only
 // the path + SHA-256 hash go in Postgres. Console (9001) isn't tunneled/published anywhere; only
 // the S3 API port (9000) needs to be reachable, and only by api, over the private compose network.
-var minio = builder.AddContainer("minio", "minio/minio")
+// minio/minio is gone from Docker Hub — pgsty/minio is a from-source build of the same server,
+// pinned to the tag the integration tests (MinioFixture) run against.
+var minio = builder.AddContainer("minio", "pgsty/minio", "RELEASE.2026-08-04T00-00-00Z")
     .WithArgs("server", "/data", "--console-address", ":9001")
     .WithEnvironment("MINIO_ROOT_USER", minioRootUser)
     .WithEnvironment("MINIO_ROOT_PASSWORD", minioRootPassword)
