@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Gatekeeper Postgres backup (local NVMe copy + optional Cloudflare R2 upload)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Not root: cerberus is in the docker group, owns the NVMe backup directory, and holds the rclone config.
+User=cerberus
+EnvironmentFile=-/home/cerberus/gatekeeper-deploy/backup.env
+ExecStart=/home/cerberus/gatekeeper-deploy/backup-db.sh

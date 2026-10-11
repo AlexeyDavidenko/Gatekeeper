@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Gatekeeper Postgres backup nightly
+
+[Timer]
+OnCalendar=*-*-* 03:30
+RandomizedDelaySec=10min
+# This box resets/reboots unexpectedly (docs/prod_server.md) — a run missed while it was down is
+# made up right after boot instead of silently skipped until the next night.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -144,6 +144,46 @@ jobs:
           echo "$response" | grep -q '"wasCreated":false' \
             || (echo "Expected wasCreated:false on re-provision" && exit 1)
 
+      # Round-trips the production backup/restore scripts (ops/) against the migrated, seeded
+      # cluster above: dump with backup-db.sh, restore into a fresh postgres:16 with restore-db.sh,
+      # then require identical per-table row counts in every database. A backup that has never been
+      # restored is just a hope.
+      - name: Backup and restore round-trip
+        env:
+          SOURCE_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          chmod +x ops/backup-db.sh ops/restore-db.sh
+          PG_CONTAINER="$SOURCE_CONTAINER" BACKUP_DIR="$RUNNER_TEMP/backups" ops/backup-db.sh
+          dump=$(ls "$RUNNER_TEMP"/backups/gatekeeper-*.sql.zst)
+
+          docker run -d --name restore-check -e POSTGRES_PASSWORD=postgres postgres:16
+          for i in $(seq 1 30); do docker exec restore-check pg_isready -h localhost -U postgres && break; sleep 1; done
+          ops/restore-db.sh "$dump" restore-check
+
+          counts() {
+            local container=$1 db=$2
+            docker exec -e PGPASSWORD=postgres "$container" psql -h localhost -U postgres -d "$db" -tA -c \
+              "select table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text
+               from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1"
+          }
+          dbs=$(docker exec -e PGPASSWORD=postgres "$SOURCE_CONTAINER" psql -h localhost -U postgres -tA -c \
+            "select datname from pg_database where not datistemplate and datname <> 'postgres' order by 1")
+          [ -n "$dbs" ] || (echo "No databases found to compare" && exit 1)
+          for db in $dbs; do
+            source_counts=$(counts "$SOURCE_CONTAINER" "$db")
+            restored_counts=$(counts restore-check "$db")
+            # Empty on both sides would "match" — a broken count query must fail, not pass.
+            [ -n "$source_counts" ] || (echo "Could not read row counts from $db" && exit 1)
+            if [ "$source_counts" != "$restored_counts" ]; then
+              echo "Row counts differ after restore in $db"
+              diff <(echo "$source_counts") <(echo "$restored_counts") || true
+              exit 1
+            fi
+            echo "$db: $(echo "$restored_counts" | tr '\n' ' ')"
+          done
+          counts restore-check gatekeeper_catalog | grep -qE '^Translations=[1-9]' \
+            || (echo "Expected seeded Translations to survive the round-trip" && exit 1)
+
       # Boots the real Web app against the already-running API (same service-discovery env var
       # shape docker-compose.yaml uses in prod: services__api__http__0), pointed at the "ci-demo"
       # tenant seeded above (Id 1 — first row in a fresh Catalog DB). This is the check that would
